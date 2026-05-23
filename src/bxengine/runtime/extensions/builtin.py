@@ -207,29 +207,25 @@ class BuiltinExtension(BxeStatelessExtension):
         return ""
 
     @staticmethod
-    @bpp_function(node_transformer=True)
-    def PARAM(nodes: list[Node], span: SpanData, context: RuntimeContext) -> Any:
-        if len(nodes) != 1:
-            raise BxeRuntimeSyntaxException("PARAM expected 1 parameter")
+    @bpp_function(node_transformer=True, aliases=["PARAM"])
+    def PARAMS(nodes: list[Node], span: SpanData, context: RuntimeContext) -> Any:
+        if len(nodes) > 1:
+            raise BxeRuntimeSyntaxException("PARAMS expected 0 or 1 parameter")
         if not context.macro_param_stack:
-            raise BxeRuntimeException("PARAM can only be used inside a macro")
+            raise BxeRuntimeException("PARAMS can only be used inside a macro")
+
+        if len(nodes) == 0:
+            return list(context.macro_param_stack[-1].all_arguments)
 
         raw_name = context.executor.evaluate_node(nodes[0], context)
         if not isinstance(raw_name, str):
-            raise TypeError(f"PARAM name must be a string: {_safe_cut(raw_name)}")
+            raise TypeError(f"PARAMS name must be a string: {_safe_cut(raw_name)}")
         _validate_variable_name(raw_name)
 
         frame = context.macro_param_stack[-1]
         if raw_name not in frame.parameter_values:
             raise NameError(f"No macro parameter named {_safe_cut(raw_name)}")
         return frame.parameter_values[raw_name]
-
-    @staticmethod
-    @bpp_function()
-    def PARAMS(context: RuntimeContext) -> list[Any]:
-        if not context.macro_param_stack:
-            raise BxeRuntimeException("PARAMS can only be used inside a macro")
-        return list(context.macro_param_stack[-1].all_arguments)
 
     @staticmethod
     @bpp_function()
@@ -309,7 +305,7 @@ class BuiltinExtension(BxeStatelessExtension):
     # ========================= Args =========================
 
     @staticmethod
-    @bpp_function()
+    @bpp_function(aliases=["ARG"])
     def ARGS(index: Any = None, context: RuntimeContext = None) -> Any:
         if index is None:
             return context.program_args
