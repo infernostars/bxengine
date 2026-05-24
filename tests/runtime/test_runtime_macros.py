@@ -85,3 +85,65 @@ class TestMacros:
         res = run_program_raw('[MACRO "bad]name" [ARRAY] "x"]')
         assert isinstance(res, ExecutorResult.Error)
         assert isinstance(res.exception, NameError)
+
+    def test_call_dynamic_macro_name(self):
+        code = '[MACRO "thing" [ARRAY "x"] [PARAM x]] [DEFINE target "thing"] [CALL [VAR target] [ARRAY "ok"]]'
+        assert run_program(code).strip() == "ok"
+
+    def test_call_dynamic_macro_name_with_at_prefix(self):
+        code = '[MACRO "thing" [ARRAY "x"] [PARAM x]] [DEFINE target "@thing"] [CALL [VAR target] [ARRAY "ok"]]'
+        assert run_program(code).strip() == "ok"
+
+    def test_call_unknown_macro_raises(self):
+        res = run_program_raw('[CALL "missing" [ARRAY]]')
+        assert isinstance(res, ExecutorResult.Error)
+        assert isinstance(res.exception, NameError)
+
+    def test_call_builtin_function(self):
+        assert run_program('[CALL "CONCAT" [ARRAY "a" "b"]]') == "ab"
+
+    def test_call_builtin_node_transformer_with_array_arguments(self):
+        assert run_program('[CALL "IF" [ARRAY 1 "ok" "no"]]') == "ok"
+
+    def test_call_builtin_name_can_be_disambiguated_from_macro(self):
+        code = '[MACRO "concat" [ARRAY] "macro"] [CALL "concat" [ARRAY "a" "b"]] [CALL "@concat" [ARRAY]]'
+        assert run_program(code).strip() == "ab macro"
+
+    def test_call_requires_array_second_parameter(self):
+        res = run_program_raw('[CALL "CONCAT" "a"]')
+        assert isinstance(res, ExecutorResult.Error)
+        assert isinstance(res.exception, TypeError)
+
+    def test_macro_nested_call_cap_boundary(self):
+        # First-level invocations do not count toward the nested cap.
+        names = [f"m{i}" for i in range(129)]
+        definitions = " ".join(
+            f'[MACRO "{name}" [ARRAY] [@{names[i + 1]}]]'
+            if i < len(names) - 1
+            else f'[MACRO "{name}" [ARRAY] "ok"]'
+            for i, name in enumerate(names)
+        )
+        code = f"{definitions} [@{names[0]}]"
+        assert run_program(code).strip() == "ok"
+
+    def test_macro_nested_call_cap_exceeded(self):
+        names = [f"m{i}" for i in range(130)]
+        definitions = " ".join(
+            f'[MACRO "{name}" [ARRAY] [@{names[i + 1]}]]'
+            if i < len(names) - 1
+            else f'[MACRO "{name}" [ARRAY] "ok"]'
+            for i, name in enumerate(names)
+        )
+        code = f"{definitions} [@{names[0]}]"
+        res = run_program_raw(code)
+        assert isinstance(res, ExecutorResult.Error)
+        assert isinstance(res.exception, BxeRuntimeException)
+        assert "cap" in str(res.exception).lower()
+
+    def test_macro_nested_call_counter_exceeded_without_extra_depth(self):
+        # Counter-based cap should apply even when nesting depth stays shallow.
+        code = '[MACRO "inner" [ARRAY] "x"] [MACRO "outer" [ARRAY] [LOOP 129 [@inner]]] [@outer]'
+        res = run_program_raw(code)
+        assert isinstance(res, ExecutorResult.Error)
+        assert isinstance(res.exception, BxeRuntimeException)
+        assert "cap" in str(res.exception).lower()

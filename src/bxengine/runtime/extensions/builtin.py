@@ -17,8 +17,8 @@ from bxengine.runtime.extensions.BxeExtension import (
 )
 from bxengine.spans import SpanData
 
-_ITERATION_LIMIT = 1024
-_LOOP_ITERATION_CAP = 1024
+_ITERATION_LIMIT = 131072
+_LOOP_ITERATION_CAP = 4096
 _MULTIPLY_LIMIT = 1e50
 
 
@@ -156,6 +156,18 @@ class BuiltinExtension(BxeStatelessExtension):
         return f"@{stripped.upper()}"
 
     @staticmethod
+    def _value_to_literal_node(value: Any, span: SpanData) -> Node:
+        if isinstance(value, list):
+            return Nodes.Function(
+                name="ARRAY",
+                arguments=[BuiltinExtension._value_to_literal_node(v, span) for v in value],
+                range=span,
+            )
+        if value is None:
+            return Nodes.StringNode("", span)
+        return Nodes.StringNode(str(value), span)
+
+    @staticmethod
     @bpp_function(node_transformer=True)
     def MACRO(nodes: list[Node], span: SpanData, context: RuntimeContext) -> str:
         if len(nodes) != 3:
@@ -205,6 +217,43 @@ class BuiltinExtension(BxeStatelessExtension):
             body=nodes[2],
         )
         return ""
+
+    @staticmethod
+    @bpp_function(node_transformer=True)
+    def CALL(nodes: list[Node], span: SpanData, context: RuntimeContext) -> Any:
+        if len(nodes) != 2:
+            raise BxeRuntimeSyntaxException("CALL expected 2 parameters")
+        target_value = context.executor.evaluate_node(nodes[0], context)
+        if not isinstance(target_value, str):
+            raise NameError(f"Function or macro name must be a string: {_safe_cut(target_value)}")
+        target_name = target_value.strip()
+        if target_name == "":
+            raise NameError("Function or macro name cannot be empty")
+
+        raw_args = context.executor.evaluate_node(nodes[1], context)
+        if not isinstance(raw_args, list):
+            raise TypeError(f"Second parameter of CALL must be an array: {_safe_cut(raw_args)}")
+        argument_nodes = [BuiltinExtension._value_to_literal_node(arg, span) for arg in raw_args]
+
+        # Explicit macro call form: [CALL "@name" [ARRAY ...]]
+        if target_name.startswith("@"):
+            macro_call_name = BuiltinExtension._normalize_macro_call_name(target_name)
+            return context.executor.invoke_macro(
+                macro_name=macro_call_name,
+                argument_nodes=argument_nodes,
+                call_span=span,
+                context=context,
+            )
+
+        # Prefer runtime/builtin function lookup for bare names.
+        function_name = target_name.upper()
+        if function_name in context.functions:
+            return context.executor.evaluate_node(
+                Nodes.Function(name=function_name, arguments=argument_nodes, range=span),
+                context,
+            )
+
+        raise BxeRuntimeException(f"\"{_safe_cut(target_name)}\" is not a function or macro")
 
     @staticmethod
     @bpp_function(node_transformer=True, aliases=["PARAM"])
@@ -744,10 +793,11 @@ class BuiltinExtension(BxeStatelessExtension):
             raise ValueError(f"Second parameter of REPEAT function is not an integer: {_safe_cut(b)}")
         if not isinstance(a, list):
             a = str(a)
-        if b > _ITERATION_LIMIT:
+
+        if len(a) * b > _ITERATION_LIMIT:
             raise ValueError(
                 f"Second parameter of REPEAT function is too large: {_safe_cut(b)} "
-                f"(limit {_ITERATION_LIMIT})"
+                f"(limit of length {_ITERATION_LIMIT})"
             )
         return a * b
 

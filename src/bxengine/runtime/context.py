@@ -36,5 +36,6 @@ class RuntimeContext:
     macros: dict[str, MacroDefinition] = field(default_factory=dict)
     macro_call_stack: list[str] = field(default_factory=list)
     macro_param_stack: list[MacroInvocationFrame] = field(default_factory=list)
+    macro_nested_calls_used: int = 0
     loop_iterations_used: int = 0
     last_exception: Exception | None = None
