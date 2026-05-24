@@ -307,9 +307,9 @@ def _offset_range(source: str, start_offset: int, end_offset: int) -> dict[str, 
 
 
 def _function_doc_markdown(info: Any) -> str:
-    parts = [f"`{info.signature}`", info.detail]
-    if info.documentation:
-        parts.append(info.documentation)
+    parts = [f"`{info.signature}`"]
+    if info.documentation_markdown:
+        parts.append(info.documentation_markdown)
     return "\n\n".join(parts)
 
 

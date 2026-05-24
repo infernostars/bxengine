@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -15,8 +16,7 @@ from bxengine.runtime.extensions.discord_stub import DiscordStubExtension
 class FunctionInfo:
     name: str
     signature: str
-    detail: str
-    documentation: str | None
+    documentation_markdown: str | None
     is_node_transformer: bool
 
 
@@ -39,9 +39,8 @@ def _iter_extension_functions(
         aliases = tuple(str(alias).upper() for alias in getattr(attr, "_bpp_function_aliases", ()))
         is_node_transformer = bool(getattr(attr, "_node_transformer", False))
         signature = _build_signature(attr, primary, is_node_transformer)
-        detail = "Special form (node-transformer)" if is_node_transformer else "Builtin function"
         raw_doc = docs_by_attr_name.get(attr_name) or inspect.getdoc(attr)
-        documentation = None if raw_doc is None else inspect.cleandoc(raw_doc)
+        documentation_markdown = _format_docstring_markdown(raw_doc)
 
         seen_names: set[str] = set()
         for name in (primary, *aliases):
@@ -52,12 +51,118 @@ def _iter_extension_functions(
                 FunctionInfo(
                     name=name,
                     signature=signature.replace(primary, name, 1),
-                    detail=detail,
-                    documentation=documentation,
+                    documentation_markdown=documentation_markdown,
                     is_node_transformer=is_node_transformer,
                 )
             )
     return infos
+
+
+_DOC_TAG_PATTERN = re.compile(r"^@(?P<tag>[a-zA-Z][a-zA-Z0-9_-]*)\b(?:\s+(?P<body>.*))?$")
+
+
+def _append_text(target: list[str], text: str) -> None:
+    clean = text.strip()
+    if clean:
+        target.append(clean)
+
+
+def _extend_last(target: list[str], text: str) -> None:
+    clean = text.strip()
+    if not clean:
+        return
+    if target:
+        target[-1] = f"{target[-1]} {clean}"
+    else:
+        target.append(clean)
+
+
+def _format_docstring_markdown(raw_doc: str | None) -> str | None:
+    if not raw_doc:
+        return None
+
+    lines = inspect.cleandoc(raw_doc).splitlines()
+    summary: list[str] = []
+    params: list[tuple[str, str]] = []
+    returns: list[str] = []
+    raises: list[str] = []
+    notes: list[str] = []
+    examples: list[str] = []
+    active: tuple[str, int] | None = None
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            active = None
+            continue
+
+        match = _DOC_TAG_PATTERN.match(stripped)
+        if match:
+            tag = match.group("tag").lower()
+            body = (match.group("body") or "").strip()
+
+            if tag == "param":
+                if body:
+                    parts = body.split(None, 1)
+                    param_name = parts[0]
+                    param_desc = parts[1] if len(parts) > 1 else ""
+                else:
+                    param_name = "param"
+                    param_desc = ""
+                params.append((param_name, param_desc))
+                active = ("param", len(params) - 1)
+            elif tag in {"return", "returns"}:
+                returns.append(body)
+                active = ("returns", len(returns) - 1)
+            elif tag in {"raise", "raises", "throws"}:
+                raises.append(body)
+                active = ("raises", len(raises) - 1)
+            elif tag == "example":
+                examples.append(body)
+                active = ("examples", len(examples) - 1)
+            else:
+                notes.append(f"@{tag} {body}".strip())
+                active = ("notes", len(notes) - 1)
+            continue
+
+        if active is None:
+            _append_text(summary, stripped)
+            continue
+
+        section, index = active
+        if section == "param":
+            name, desc = params[index]
+            params[index] = (name, f"{desc} {stripped}".strip())
+        elif section == "returns":
+            _extend_last(returns, stripped)
+        elif section == "raises":
+            _extend_last(raises, stripped)
+        elif section == "examples":
+            _extend_last(examples, stripped)
+        else:
+            _extend_last(notes, stripped)
+
+    parts: list[str] = []
+    if summary:
+        parts.append(" ".join(summary))
+    if params:
+        parts.append(
+            "**Parameters**\n"
+            + "\n".join(
+                f"- `{name}`: {desc}" if desc else f"- `{name}`"
+                for name, desc in params
+            )
+        )
+    if returns:
+        parts.append("**Returns**\n" + "\n".join(f"- {item}" for item in returns))
+    if raises:
+        parts.append("**Raises**\n" + "\n".join(f"- {item}" for item in raises))
+    if examples:
+        parts.append("**Examples**\n" + "\n".join(f"- `{item}`" for item in examples))
+    if notes:
+        parts.append("**Notes**\n" + "\n".join(f"- {item}" for item in notes))
+
+    return "\n\n".join(part for part in parts if part).strip() or None
 
 
 def _build_signature(func: object, display_name: str, is_node_transformer: bool) -> str:

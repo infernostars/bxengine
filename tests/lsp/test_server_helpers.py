@@ -1,5 +1,6 @@
 from bxengine.lsp.functions import get_function_catalog
 from bxengine.lsp.server import (
+    _function_doc_markdown,
     _declared_macros,
     completion_prefix_at,
     completion_span_at,
@@ -34,8 +35,26 @@ def test_function_catalog_contains_core_functions():
     assert "IF" in names
     assert "GLOBAL" in names
     randint = next(entry for entry in catalog if entry.name == "RANDINT")
-    assert randint.documentation is not None
-    assert "Generates a random integer" in randint.documentation
+    assert randint.documentation_markdown is not None
+    assert "Generates a random integer" in randint.documentation_markdown
+    assert "**Parameters**" in randint.documentation_markdown
+    assert "**Returns**" in randint.documentation_markdown
+
+
+def test_function_doc_markdown_uses_clean_sections_without_prefixes():
+    catalog = get_function_catalog()
+    randint = next(entry for entry in catalog if entry.name == "RANDINT")
+    doc = _function_doc_markdown(randint)
+    assert doc.startswith("`[RANDINT a b]`")
+    assert "Builtin function" not in doc
+    assert "Special form (node-transformer)" not in doc
+    assert "- `a`:" in doc
+    assert "- `b`:" in doc
+
+    if_info = next(entry for entry in catalog if entry.name == "IF")
+    if_doc = _function_doc_markdown(if_info)
+    assert if_doc.startswith("`[IF ...]`")
+    assert "Special form (node-transformer)" not in if_doc
 
 
 def test_completion_prefix_at():
