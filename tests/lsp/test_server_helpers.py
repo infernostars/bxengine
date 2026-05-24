@@ -1,5 +1,11 @@
 from bxengine.lsp.functions import get_function_catalog
-from bxengine.lsp.server import _declared_macros, completion_prefix_at, position_to_offset, word_at_offset
+from bxengine.lsp.server import (
+    _declared_macros,
+    completion_prefix_at,
+    completion_span_at,
+    position_to_offset,
+    word_at_offset,
+)
 
 
 def test_position_to_offset_uses_utf16_columns():
@@ -31,6 +37,11 @@ def test_function_catalog_contains_core_functions():
 def test_completion_prefix_at():
     source = "[@hel"
     assert completion_prefix_at(source, len(source)) == "@hel"
+
+
+def test_completion_span_at():
+    source = "[@hel"
+    assert completion_span_at(source, len(source)) == (1, 5)
 
 
 def test_declared_macros_extracts_static_names():

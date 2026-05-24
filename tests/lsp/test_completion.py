@@ -31,6 +31,9 @@ def test_completion_prioritizes_declared_macros_in_macro_context(monkeypatch):
     assert items[0]["label"] == "@FOO"
     assert items[1]["label"] == "@BAR"
     assert items[0]["sortText"].startswith("0000_")
+    assert items[0]["textEdit"]["newText"] == "@FOO"
+    assert items[0]["textEdit"]["range"]["start"]["character"] == len(source) - 1
+    assert items[0]["textEdit"]["range"]["end"]["character"] == len(source)
     concat_item = next(item for item in items if item["label"] == "CONCAT")
     assert concat_item["sortText"].startswith("1000_")
 
@@ -62,4 +65,5 @@ def test_completion_defaults_to_builtin_order_outside_macro_context(monkeypatch)
     items = result["items"]
     assert not items[0]["label"].startswith("@")
     assert items[0]["sortText"].startswith("0000_")
-
+    assert items[0]["textEdit"]["range"]["start"]["character"] == 1
+    assert items[0]["textEdit"]["range"]["end"]["character"] == len(source)

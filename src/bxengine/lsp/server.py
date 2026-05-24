@@ -169,6 +169,8 @@ class BxLanguageServer:
             character_utf16=character,
         )
         prefix = completion_prefix_at(source, offset)
+        replace_start, replace_end = completion_span_at(source, offset)
+        replace_range = _offset_range(source, replace_start, replace_end)
         macro_context = prefix.startswith("@")
         declared_macros = _declared_macros(source) if macro_context else ()
 
@@ -180,6 +182,10 @@ class BxLanguageServer:
                     "kind": 3,  # Function
                     "detail": f"[{macro} ...]",
                     "insertText": macro,
+                    "textEdit": {
+                        "range": replace_range,
+                        "newText": macro,
+                    },
                     "sortText": f"0000_{i:04d}_{macro}",
                     "preselect": i == 0,
                     "documentation": {
@@ -195,6 +201,10 @@ class BxLanguageServer:
                 "kind": 3,  # Function
                 "detail": info.signature,
                 "insertText": info.name,
+                "textEdit": {
+                    "range": replace_range,
+                    "newText": info.name,
+                },
                 "sortText": f"{'1000' if macro_context else '0000'}_{info.name}",
                 "documentation": {
                     "kind": "markdown",
@@ -376,6 +386,17 @@ def completion_prefix_at(source: str, offset: int) -> str:
     while start > 0 and _is_symbol_char(source[start - 1]):
         start -= 1
     return source[start:offset]
+
+
+def completion_span_at(source: str, offset: int) -> tuple[int, int]:
+    if not source:
+        return (0, 0)
+
+    offset = max(0, min(offset, len(source)))
+    start = offset
+    while start > 0 and _is_symbol_char(source[start - 1]):
+        start -= 1
+    return (start, offset)
 
 
 def _declared_macros(source: str) -> tuple[str, ...]:
