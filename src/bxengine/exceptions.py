@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from bxengine.spans import SpanData
 
 
@@ -17,7 +19,9 @@ class BxeUnclosedStringException(BxeSyntaxException):
         self.position = position
 
 class ProgramDefinedException(BxeRuntimeException):
-    pass
+    def __init__(self, detail: Any):
+        super().__init__(str(detail))
+        self.bxe_detail = detail
 
 class BxeRuntimeSyntaxException(BxeRuntimeException):
     pass

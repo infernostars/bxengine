@@ -7,7 +7,7 @@ from typing import Any
 
 from bxengine.exceptions import (
     BxeRuntimeException,
-    BxeRuntimeSyntaxException,
+    BxeRuntimeSyntaxException, ProgramDefinedException,
 )
 from bxengine.parsing.nodes import Node, Nodes
 from bxengine.runtime.context import RuntimeContext, MacroDefinition, MacroParameterSpec
@@ -285,6 +285,8 @@ class BuiltinExtension(BxeStatelessExtension):
             case "type":
                 return type(context.last_exception).__name__
             case "detail":
+                if isinstance(context.last_exception, ProgramDefinedException):
+                    return context.last_exception.bxe_detail
                 return str(context.last_exception)
             case _:
                 raise BxeRuntimeSyntaxException(f"Unknown exception info parameter {detail}")
@@ -327,7 +329,7 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def THROW(a: Any) -> None:
-        raise BxeRuntimeException(str(a))
+        raise ProgramDefinedException(a)
 
     # ========================= Variables =========================
 
