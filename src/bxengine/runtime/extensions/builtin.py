@@ -473,6 +473,10 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def RANDINT(a: Any, b: Any) -> int:
+        """Generates a random integer number between a and b, including a but not b
+        @param a the minimum of the range, inclusive
+        @param b the maximum of the range, exclusive
+        @returns the random number"""
         if not _is_whole(a):
             raise ValueError(f"First parameter of RANDINT function is not an integer: {_safe_cut(a)}")
         if not _is_whole(b):
@@ -485,6 +489,10 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def RANDOM(a: Any, b: Any) -> float:
+        """Generates a random number between a and b
+        @param a the minimum of the range
+        @param b the maximum of the range
+        @returns the random number"""
         if not _is_number(a):
             raise ValueError(f"First parameter of RANDOM function is not a number: {_safe_cut(a)}")
         if not _is_number(b):
@@ -494,6 +502,9 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def FLOOR(a: Any) -> int:
+        """Returns the floor of a number; the part before the decimal point
+        @param a the number to be floored
+        @returns the floor of n"""
         if not _is_number(a):
             raise ValueError(f"FLOOR function parameter is not a number: {_safe_cut(a)}")
         return math.floor(float(a))
@@ -501,6 +512,9 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def CEIL(a: Any) -> int:
+        """Returns the ceiling of a number; the smallest whole number greater or equal to it
+        @param a the number to be ceiled
+        @returns the ceil of n"""
         if not _is_number(a):
             raise ValueError(f"CEIL function parameter is not a number: {_safe_cut(a)}")
         return math.ceil(float(a))
@@ -508,6 +522,9 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def ROUND(a: Any, b: Any = 0) -> int | float:
+        """Rounds a number to the closest whole number
+        @param a the number to be rounded
+        @returns the rounded number"""
         if not _is_number(a):
             raise ValueError(f"ROUND function parameter is not a number: {_safe_cut(a)}")
         if not _is_whole(b):
