@@ -14,6 +14,8 @@ from bxengine.runtime.extensions.BxeExtension import (
 )
 from bxengine.spans import SpanData
 
+_MACRO_NESTED_CALL_CAP = 4096
+
 
 @dataclass(frozen=True)
 class FunctionEntry:
@@ -186,7 +188,12 @@ class Executor:
             func_name = node.name.upper()
 
             if func_name.startswith("@") and func_name in context.macros:
-                return self._evaluate_macro_call(func_name, node, context)
+                return self.invoke_macro(
+                    macro_name=func_name,
+                    argument_nodes=node.arguments,
+                    call_span=node.range,
+                    context=context,
+                )
 
             entry = context.functions.get(func_name)
 
@@ -208,50 +215,71 @@ class Executor:
             self._attach_span_if_missing(e, node.range)
             raise
 
-    def _evaluate_macro_call(
-        self, macro_name: str, node: Nodes.Function, context: RuntimeContext
+    def invoke_macro(
+        self,
+        macro_name: str,
+        argument_nodes: list[Node],
+        call_span: SpanData,
+        context: RuntimeContext,
     ) -> Any:
-        macro = context.macros[macro_name]
-
-        if macro_name in context.macro_call_stack:
-            cycle = " -> ".join((*context.macro_call_stack, macro_name))
-            raise BxeRuntimeException(f"Macro recursion detected: {cycle}")
-
-        evaluated_args = [self._evaluate_node(arg, context) for arg in node.arguments]
-        required_args = sum(1 for p in macro.parameters if not p.optional)
-        max_args = None if macro.supports_varargs else len(macro.parameters)
-
-        if len(evaluated_args) < required_args:
-            raise TypeError(
-                f"{macro.call_name} expected at least {required_args} parameters, "
-                f"but got {len(evaluated_args)}"
-            )
-        if max_args is not None and len(evaluated_args) > max_args:
-            raise TypeError(
-                f"{macro.call_name} expected at most {max_args} parameters, "
-                f"but got {len(evaluated_args)}"
-            )
-
-        param_scope: dict[str, Any] = {}
-        for index, param in enumerate(macro.parameters):
-            if index < len(evaluated_args):
-                param_scope[param.name] = evaluated_args[index]
-            else:
-                # Optional parameters default to empty string when omitted.
-                param_scope[param.name] = ""
-
-        context.macro_call_stack.append(macro_name)
-        context.macro_param_stack.append(
-            MacroInvocationFrame(
-                parameter_values=param_scope,
-                all_arguments=tuple(evaluated_args),
-            )
-        )
         try:
-            return self._evaluate_node(macro.body, context)
-        finally:
-            context.macro_param_stack.pop()
-            context.macro_call_stack.pop()
+            if macro_name not in context.macros:
+                raise NameError(f"Macro {macro_name} does not exist")
+
+            macro = context.macros[macro_name]
+
+            if macro_name in context.macro_call_stack:
+                cycle = " -> ".join((*context.macro_call_stack, macro_name))
+                raise BxeRuntimeException(f"Macro recursion detected: {cycle}")
+
+            evaluated_args = [self._evaluate_node(arg, context) for arg in argument_nodes]
+            required_args = sum(1 for p in macro.parameters if not p.optional)
+            max_args = None if macro.supports_varargs else len(macro.parameters)
+
+            if len(evaluated_args) < required_args:
+                raise TypeError(
+                    f"{macro.call_name} expected at least {required_args} parameters, "
+                    f"but got {len(evaluated_args)}"
+                )
+            if max_args is not None and len(evaluated_args) > max_args:
+                raise TypeError(
+                    f"{macro.call_name} expected at most {max_args} parameters, "
+                    f"but got {len(evaluated_args)}"
+                )
+
+            # First-level macro invocations do not count toward this cap.
+            if context.macro_call_stack:
+                projected = context.macro_nested_calls_used + 1
+                if projected > _MACRO_NESTED_CALL_CAP:
+                    raise BxeRuntimeException(
+                        "Macro nested call cap exceeded: "
+                        f"attempted {projected} nested calls (limit {_MACRO_NESTED_CALL_CAP})"
+                    )
+                context.macro_nested_calls_used = projected
+
+            param_scope: dict[str, Any] = {}
+            for index, param in enumerate(macro.parameters):
+                if index < len(evaluated_args):
+                    param_scope[param.name] = evaluated_args[index]
+                else:
+                    # Optional parameters default to empty string when omitted.
+                    param_scope[param.name] = ""
+
+            context.macro_call_stack.append(macro_name)
+            context.macro_param_stack.append(
+                MacroInvocationFrame(
+                    parameter_values=param_scope,
+                    all_arguments=tuple(evaluated_args),
+                )
+            )
+            try:
+                return self._evaluate_node(macro.body, context)
+            finally:
+                context.macro_param_stack.pop()
+                context.macro_call_stack.pop()
+        except Exception as e:
+            self._attach_span_if_missing(e, call_span)
+            raise
 
     def _evaluate_node(self, node: Node, context: RuntimeContext) -> Any:
         if isinstance(node, Nodes.Function):
