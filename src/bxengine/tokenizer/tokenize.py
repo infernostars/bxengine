@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 from .tokens import Token, Tokens
-from .stringreader import StringReader, BxeSyntaxException, BxeUnclosedStringException
+from .stringreader import StringReader, BxeSyntaxException
 from bxengine.spans import SpanData
+from bxengine.syntax_warnings import BxeSyntaxWarning
 import functools
 
 
@@ -16,6 +17,7 @@ class TokenizationResult:
     @dataclass(frozen=True)
     class Success:
         tokens: Tuple[Token, ...]
+        warnings: Tuple[BxeSyntaxWarning, ...] = ()
 
         def pretty(self) -> str:
             string = f"{len(self.tokens)} tokens:"
@@ -33,6 +35,7 @@ class Tokenizer:
         self.file_name: str = ""
         self.reader: StringReader = reader
         self.nesting_level: int = 0
+        self.warnings: list[BxeSyntaxWarning] = []
 
     @staticmethod
     @functools.lru_cache(maxsize=128, typed=False)
@@ -52,7 +55,10 @@ class Tokenizer:
                 # Padding end-of-file tokens
                 for _ in range(5):
                     tokens.append(Tokens.EndOfFile(self.create_span()))
-                return TokenizationResult.Success(tuple(tokens))
+                return TokenizationResult.Success(
+                    tokens=tuple(tokens),
+                    warnings=tuple(self.warnings),
+                )
 
             if isinstance(token, Tokens.OuterString):
                 if tokens and isinstance(tokens[-1], Tokens.OuterString):
@@ -75,8 +81,6 @@ class Tokenizer:
     def _tokenize_once(self) -> Token:
         try:
             return self._tokenize_inner()
-        except BxeUnclosedStringException as e:
-            return Tokens.Error(f"Unclosed string", self.create_span(e.position))
         except BxeSyntaxException as e:
             return Tokens.Error(str(e), self.create_span())
         except IndexError:
@@ -97,7 +101,15 @@ class Tokenizer:
 
         match self.reader.peek():
             case '"' | '“' | '”':
-                return Tokens.QuotedString(self.reader.read_quoted_string(), self.create_span(start))
+                quoted, terminated = self.reader.read_quoted_string_with_status()
+                if not terminated:
+                    self._warn(
+                        message=(
+                            "Unterminated quoted string is accepted as-is (compat behavior). Add a quote."
+                        ),
+                        span=self.create_span(start, start + 1),
+                    )
+                return Tokens.QuotedString(quoted, self.create_span(start))
 
             case '[':
                 self.reader.expect('[')
@@ -109,6 +121,11 @@ class Tokenizer:
                 self.nesting_level -= 1
                 if self.nesting_level < 0: # BPPCOMPAT: extra brackets get thrown away
                     self.nesting_level = 0
+                    self._warn(
+                        message="Extra closing bracket is ignored at top level (compat behavior).\n" +
+                        "If you want a literal ']' character in the output, do '\\]'.",
+                        span=self.create_span(start, start + 1),
+                    )
                     return Tokens.OuterString("", self.create_span(start))
                 return Tokens.CloseBracket(self.create_span(start))
 
@@ -186,3 +203,6 @@ class Tokenizer:
         actual_start = cursor if start is None else start
         actual_end = cursor if end is None else end
         return SpanData(actual_start, actual_end, reader._string)
+
+    def _warn(self, message: str, span: SpanData) -> None:
+        self.warnings.append(BxeSyntaxWarning(message=message, range=span))

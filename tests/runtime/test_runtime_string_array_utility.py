@@ -87,7 +87,7 @@ class TestUtility:
         assert run_program('[REPEAT "ab" 3]') == "ababab"
 
     def test_repeat_limit(self):
-        res = run_program_raw("[REPEAT x 9999]")
+        res = run_program_raw("[REPEAT x 131073]")
         assert isinstance(res, ExecutorResult.Error)
         assert isinstance(res.exception, ValueError)
 

@@ -93,7 +93,7 @@ class TestControlFlow:
         assert run_program('[LOOP 0 "x"]') == ""
 
     def test_loop_cap(self):
-        res = run_program_raw('[LOOP 1025 "x"]')
+        res = run_program_raw('[LOOP 4100 "x"]')
         assert isinstance(res, ExecutorResult.Error)
         assert isinstance(res.exception, BxeRuntimeException)
         assert "cap" in str(res.exception).lower()
@@ -113,7 +113,7 @@ class TestControlFlow:
         assert out == "x" * 16
 
     def test_loop_shared_cap_across_nested_loops(self):
-        res = run_program_raw('[LOOP 33 [LOOP 33 "x"]]')
+        res = run_program_raw('[LOOP 129 [LOOP 33 "x"]]')
         assert isinstance(res, ExecutorResult.Error)
         assert isinstance(res.exception, BxeRuntimeException)
         assert "cap" in str(res.exception).lower()

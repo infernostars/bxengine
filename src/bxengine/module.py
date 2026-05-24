@@ -7,6 +7,7 @@ from bxengine.tokenizer.tokenize import Tokenizer, TokenizationResult
 from bxengine.parsing.parser import Parser, ParsingResult
 from bxengine.runtime.executor import Executor, ExecutorResult
 from bxengine.runtime.extensions.builtin import BuiltinExtension
+from bxengine.syntax_warnings import BxeSyntaxWarning
 
 
 DEFAULT_TEST = """
@@ -25,16 +26,34 @@ yetempts] + 1]] [CONCAT "But I'm pleased to say you beat the highscore of **" [G
 """
 
 
-def run_code(code: str, program_args: list[str] | None = None) -> None:
+def _print_syntax_warnings(warnings: tuple[BxeSyntaxWarning, ...]) -> None:
+    if not warnings:
+        return
+    for warning in warnings:
+        print(f"Warning [{warning.source}]: {warning.message}", file=sys.stderr)
+        print("", file=sys.stderr)
+        print(warning.range.debug_info(), file=sys.stderr)
+        print("", file=sys.stderr)
+
+
+def run_code(code: str, program_args: list[str] | None = None, debug: bool = False) -> None:
     tokenizer_res = Tokenizer.tokenize(code)
     if isinstance(tokenizer_res, TokenizationResult.Error):
         print(tokenizer_res.message, "\n\n", tokenizer_res.range.debug_info(), sep="")
         return
 
+    if debug:
+        _print_syntax_warnings(tokenizer_res.warnings)
+
     parser_res = Parser.parse(code, tokenizer_res.tokens)
     if isinstance(parser_res, ParsingResult.Error):
+        if debug:
+            _print_syntax_warnings(parser_res.warnings)
         print(parser_res.message, "\n\n", parser_res.range.debug_info(), sep="")
         return
+
+    if debug:
+        _print_syntax_warnings(parser_res.warnings)
 
     executor = Executor(
         extensions=[BuiltinExtension()],
@@ -59,14 +78,15 @@ def _module_main():
     parser = argparse.ArgumentParser(prog="bxengine", description="B++ runtime engine")
     parser.add_argument("file", nargs="?", help="Path to a .bx script file")
     parser.add_argument("-e", "--eval", metavar="CODE", help="Execute a string of B++ code")
+    parser.add_argument("-d", "--debug", action="store_true", help="Show syntax compatibility warnings")
     parser.add_argument("args", nargs="*", help="Arguments passed to the script (accessible via ARGS)")
 
     parsed = parser.parse_args()
 
     if parsed.eval:
-        run_code(parsed.eval, parsed.args)
+        run_code(parsed.eval, parsed.args, debug=parsed.debug)
     elif parsed.file:
         with open(parsed.file) as f:
-            run_code(f.read(), parsed.args)
+            run_code(f.read(), parsed.args, debug=parsed.debug)
     else:
-        run_code(DEFAULT_TEST, parsed.args)
+        run_code(DEFAULT_TEST, parsed.args, debug=parsed.debug)

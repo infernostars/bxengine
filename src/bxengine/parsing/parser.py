@@ -2,6 +2,7 @@ from bxengine.parsing.nodes import Node, Nodes
 from typing import List, Tuple, Sequence
 from bxengine.tokenizer.tokens import Token, Tokens
 from bxengine.spans import SpanData
+from bxengine.syntax_warnings import BxeSyntaxWarning
 from dataclasses import dataclass
 import functools
 
@@ -11,10 +12,12 @@ class ParsingResult:
     class Error:
         message: str
         range: SpanData
+        warnings: Tuple[BxeSyntaxWarning, ...] = ()
 
     @dataclass(frozen=True)
     class Success:
         nodes: List[Node]
+        warnings: Tuple[BxeSyntaxWarning, ...] = ()
 
         def pretty(self) -> str:
             string = f"{len(self.nodes)} nodes:"
@@ -36,6 +39,7 @@ class Parser:
         self.token_list: Sequence[Token] = ()
         self.is_function_declaration: bool = False
         self.index: int = 0
+        self.warnings: list[BxeSyntaxWarning] = []
 
     @staticmethod
     def parse(contents: str, token_list: Sequence[Token]) -> ParsingResult.Success | ParsingResult.Error:
@@ -74,9 +78,16 @@ class Parser:
             node = self._parse_once()
 
             if isinstance(node, Nodes.Error):
-                return ParsingResult.Error(node.message, node.range)
+                return ParsingResult.Error(
+                    message=node.message,
+                    range=node.range,
+                    warnings=tuple(self.warnings),
+                )
             elif isinstance(node, Nodes._Complete):
-                return ParsingResult.Success(node_list)
+                return ParsingResult.Success(
+                    nodes=node_list,
+                    warnings=tuple(self.warnings),
+                )
 
             node_list.append(node)
 
@@ -154,6 +165,13 @@ class Parser:
                 self.nesting_level -= 1
                 self.nesting_token_indexes.pop()
                 last_token = self.token_list[-1] if self.token_list else open_bracket
+                self._warn(
+                    message=(
+                        "Unclosed '[' is auto-closed at end of file (compat behavior). "
+                        "Add a matching ']'."
+                    ),
+                    span=open_bracket.range,
+                )
                 return Nodes.Function(function_name, arguments, self.create_span(open_bracket, last_token))
 
             current = self.token_list[self.index]
@@ -162,6 +180,14 @@ class Parser:
             if isinstance(current, (Tokens.CloseBracket, Tokens.EndOfFile)):
                 if isinstance(current, Tokens.CloseBracket):
                     self.index += 1
+                else:
+                    self._warn(
+                        message=(
+                            "Unclosed '[' is auto-closed at end of file (compat behavior). "
+                            "Add a matching ']'."
+                        ),
+                        span=open_bracket.range,
+                    )
                 self.nesting_level -= 1
                 self.nesting_token_indexes.pop()
                 return Nodes.Function(function_name, arguments, self.create_span(open_bracket, current))
@@ -202,3 +228,6 @@ class Parser:
         start_int = start.range.cursor_start
         end_int = end.range.cursor_end
         return SpanData(start_int, end_int, self.contents)
+
+    def _warn(self, message: str, span: SpanData) -> None:
+        self.warnings.append(BxeSyntaxWarning(message=message, range=span))
