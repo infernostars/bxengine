@@ -596,6 +596,30 @@ class BuiltinExtension(BxeStatelessExtension):
         return max(a)
 
     # ========================= String =========================
+    @staticmethod
+    @bpp_function()
+    def UPPER(a: str):
+        return a.upper()
+
+    @staticmethod
+    @bpp_function()
+    def LOWER(a: str):
+        return a.lower()
+
+    @staticmethod
+    @bpp_function()
+    def STRIP(a: str, side: str | None = None, chars: str | None = None):
+        side = side if side is not None else "both"
+        side = side.lower()
+        match side:
+            case "both":
+                return a.strip(chars)
+            case "right":
+                return a.rstrip(chars)
+            case "left":
+                return a.lstrip(chars)
+            case _:
+                raise BxeRuntimeException(f"Unknown side to strip {_safe_cut(side)}")
 
     @staticmethod
     @bpp_function()

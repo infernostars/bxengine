@@ -16,5 +16,8 @@ class BxeUnclosedStringException(BxeSyntaxException):
         super().__init__("Unclosed string")
         self.position = position
 
+class ProgramDefinedException(BxeRuntimeException):
+    pass
+
 class BxeRuntimeSyntaxException(BxeRuntimeException):
     pass

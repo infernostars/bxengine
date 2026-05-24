@@ -97,9 +97,9 @@ class SpanData:
             err_text = start_line_text[start_col - 1:end_col - 1]
             suffix = start_line_text[end_col - 1:]
 
-            # Cap if the length is > 55 so 25+[...]+25 actually shortens the string
-            if len(err_text) > 55:
-                err_text = err_text[:25] + "[...]" + err_text[-25:]
+            # Cap if the length is > 75 so 35+(...)+35 actually shortens the string
+            if len(err_text) > 75:
+                err_text = err_text[:35] + "(...)" + err_text[-35:]
 
             return DebugInfo(
                 is_multiline=False,
@@ -113,15 +113,15 @@ class SpanData:
             first_prefix = start_line_text[:start_col - 1]
             first_err = start_line_text[start_col - 1:]
 
-            if len(first_err) > 30:
-                first_err = first_err[:25] + "[...]"
+            if len(first_err) > 40:
+                first_err = first_err[:35] + "(...)"
 
             last_prefix = ""
             last_err = end_line_text[:end_col - 1]
             last_suffix = end_line_text[end_col - 1:]
 
-            if len(last_err) > 30:
-                last_err = "[...]" + last_err[-25:]
+            if len(last_err) > 40:
+                last_err = "(...)" + last_err[-35:]
 
             return DebugInfo(
                 is_multiline=True,
