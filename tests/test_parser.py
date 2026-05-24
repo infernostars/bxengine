@@ -72,10 +72,16 @@ def test_empty_brackets_error():
 
 def test_unclosed_bracket_auto_closed():
     # BPPCOMPAT: unclosed brackets at EOF are auto-closed
-    nodes = parse("[FUNC")
+    tok = Tokenizer.tokenize("[FUNC")
+    assert isinstance(tok, TokenizationResult.Success)
+    res = Parser.parse("[FUNC", tok.tokens)
+    assert isinstance(res, ParsingResult.Success)
+    nodes = res.nodes
     assert len(nodes) == 1
     assert isinstance(nodes[0], Nodes.Function)
     assert nodes[0].name == "FUNC"
+    assert len(res.warnings) == 1
+    assert "auto-closed" in res.warnings[0].message.lower()
 
 
 def test_multiple_top_level_functions():

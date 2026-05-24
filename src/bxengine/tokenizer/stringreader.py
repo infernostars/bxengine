@@ -1,4 +1,4 @@
-from bxengine.exceptions import BxeSyntaxException, BxeUnclosedStringException
+from bxengine.exceptions import BxeSyntaxException
 
 
 class StringReader:
@@ -108,12 +108,9 @@ class StringReader:
         self._cursor = cursor
         return "".join(out)
 
-    def read_quoted_string(self) -> str:
-
-        original_position = self._cursor
-
+    def read_quoted_string_with_status(self) -> tuple[str, bool]:
         if not self.can_read():
-            return ""
+            return "", False
 
         string = self._string
         cursor = self._cursor
@@ -138,13 +135,16 @@ class StringReader:
                 escaped = True
             elif c in '\"“”':
                 self._cursor = cursor
-                return "".join(result)
+                return "".join(result), True
             else:
                 result.append(c)
 
         self._cursor = cursor
-        return "".join(result) # BXECOMPAT: unterminated strings return
-        raise BxeUnclosedStringException(original_position)
+        return "".join(result), False  # BXECOMPAT: unterminated strings return
+
+    def read_quoted_string(self) -> str:
+        value, _terminated = self.read_quoted_string_with_status()
+        return value
 
     def read_number_string(self) -> str:
         string = self._string

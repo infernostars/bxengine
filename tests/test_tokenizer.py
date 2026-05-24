@@ -94,3 +94,17 @@ def test_outer_string_dangling_backslash_is_swallowed():
     outers = [t for t in tokens if isinstance(t, Tokens.OuterString)]
     assert len(outers) == 1
     assert outers[0].value == "abc"
+
+
+def test_warns_on_extra_closing_bracket():
+    res = Tokenizer.tokenize("hello ]")
+    assert isinstance(res, TokenizationResult.Success)
+    assert len(res.warnings) == 1
+    assert "ignored" in res.warnings[0].message.lower()
+
+
+def test_warns_on_unterminated_quote():
+    res = Tokenizer.tokenize('[CONCAT "oops]')
+    assert isinstance(res, TokenizationResult.Success)
+    assert len(res.warnings) == 1
+    assert "unterminated" in res.warnings[0].message.lower()

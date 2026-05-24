@@ -24,6 +24,7 @@ classifiers = [
 
 [project.scripts]
 bxengine = "bxengine.module:_module_main"
+bxengine-lsp = "bxengine.lsp.server:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
