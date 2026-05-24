@@ -4,6 +4,7 @@ import inspect
 from dataclasses import dataclass
 from functools import lru_cache
 
+from bxengine.docs import get_docs
 from bxengine.runtime.extensions.BxeExtension import BxeExtensionBase
 from bxengine.runtime.extensions.BxeExtension import GlobalVariableBppExtension
 from bxengine.runtime.extensions.builtin import BuiltinExtension
@@ -15,10 +16,14 @@ class FunctionInfo:
     name: str
     signature: str
     detail: str
+    documentation: str | None
     is_node_transformer: bool
 
 
-def _iter_extension_functions(ext: BxeExtensionBase) -> list[FunctionInfo]:
+def _iter_extension_functions(
+    ext: BxeExtensionBase,
+    docs_by_attr_name: dict[str, str],
+) -> list[FunctionInfo]:
     infos: list[FunctionInfo] = []
     for attr_name in dir(ext):
         if attr_name.startswith("_"):
@@ -35,6 +40,8 @@ def _iter_extension_functions(ext: BxeExtensionBase) -> list[FunctionInfo]:
         is_node_transformer = bool(getattr(attr, "_node_transformer", False))
         signature = _build_signature(attr, primary, is_node_transformer)
         detail = "Special form (node-transformer)" if is_node_transformer else "Builtin function"
+        raw_doc = docs_by_attr_name.get(attr_name) or inspect.getdoc(attr)
+        documentation = None if raw_doc is None else inspect.cleandoc(raw_doc)
 
         seen_names: set[str] = set()
         for name in (primary, *aliases):
@@ -46,6 +53,7 @@ def _iter_extension_functions(ext: BxeExtensionBase) -> list[FunctionInfo]:
                     name=name,
                     signature=signature.replace(primary, name, 1),
                     detail=detail,
+                    documentation=documentation,
                     is_node_transformer=is_node_transformer,
                 )
             )
@@ -77,7 +85,8 @@ def get_function_catalog() -> tuple[FunctionInfo, ...]:
 
     all_infos: dict[str, FunctionInfo] = {}
     for provider in providers:
-        for info in _iter_extension_functions(provider):
+        docs_by_attr_name = get_docs(type(provider))
+        for info in _iter_extension_functions(provider, docs_by_attr_name):
             all_infos[info.name] = info
 
     return tuple(sorted(all_infos.values(), key=lambda i: i.name))

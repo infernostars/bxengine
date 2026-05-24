@@ -28,10 +28,14 @@ def test_word_at_offset_handles_macro_name():
 
 
 def test_function_catalog_contains_core_functions():
-    names = {entry.name for entry in get_function_catalog()}
+    catalog = get_function_catalog()
+    names = {entry.name for entry in catalog}
     assert "CONCAT" in names
     assert "IF" in names
     assert "GLOBAL" in names
+    randint = next(entry for entry in catalog if entry.name == "RANDINT")
+    assert randint.documentation is not None
+    assert "Generates a random integer" in randint.documentation
 
 
 def test_completion_prefix_at():

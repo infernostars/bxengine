@@ -208,7 +208,7 @@ class BxLanguageServer:
                 "sortText": f"{'1000' if macro_context else '0000'}_{info.name}",
                 "documentation": {
                     "kind": "markdown",
-                    "value": f"`{info.signature}`\n\n{info.detail}",
+                    "value": _function_doc_markdown(info),
                 },
             }
             for info in get_function_catalog()
@@ -258,7 +258,7 @@ class BxLanguageServer:
             _send_response(msg_id, None)
             return
 
-        value = f"`{info.signature}`\n\n{info.detail}"
+        value = _function_doc_markdown(info)
         _send_response(
             msg_id,
             {
@@ -304,6 +304,13 @@ def _offset_range(source: str, start_offset: int, end_offset: int) -> dict[str, 
         "start": _offset_position(source, start_offset),
         "end": _offset_position(source, end_offset),
     }
+
+
+def _function_doc_markdown(info: Any) -> str:
+    parts = [f"`{info.signature}`", info.detail]
+    if info.documentation:
+        parts.append(info.documentation)
+    return "\n\n".join(parts)
 
 
 def _offset_position(source: str, offset: int) -> dict[str, int]:
