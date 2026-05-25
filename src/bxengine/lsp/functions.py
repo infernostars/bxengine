@@ -8,9 +8,12 @@ from functools import lru_cache
 from bxengine.docs import build_signature_from_docstring
 from bxengine.docs import get_docs
 from bxengine.runtime.extensions.BxeExtension import BxeExtensionBase
-from bxengine.runtime.extensions.BxeExtension import GlobalVariableBppExtension
 from bxengine.runtime.extensions.builtin import BuiltinExtension
-from bxengine.runtime.extensions.discord_stub import DiscordStubExtension
+from bxengine.runtime.extensions.discord_stub import (
+    BrainGlobalExtension,
+    BrainUserExtension,
+    DiscordStubExtension,
+)
 
 
 @dataclass(frozen=True)
@@ -188,7 +191,8 @@ def _format_docstring_markdown(raw_doc: str | None) -> str | None:
 def get_function_catalog() -> tuple[FunctionInfo, ...]:
     providers: list[BxeExtensionBase] = [
         BuiltinExtension(),
-        GlobalVariableBppExtension(),
+        BrainGlobalExtension(),
+        BrainUserExtension(),
         DiscordStubExtension(),
     ]
 

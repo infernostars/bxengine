@@ -1,8 +1,11 @@
 import argparse
 import sys
 
-from bxengine.runtime.extensions.BxeExtension import GlobalVariableBppExtension
-from bxengine.runtime.extensions.discord_stub import DiscordStubExtension
+from bxengine.runtime.extensions.discord_stub import (
+    BrainGlobalExtension,
+    BrainUserExtension,
+    DiscordStubExtension,
+)
 from bxengine.tokenizer.tokenize import Tokenizer, TokenizationResult
 from bxengine.parsing.parser import Parser, ParsingResult
 from bxengine.runtime.executor import Executor, ExecutorResult
@@ -57,7 +60,7 @@ def run_code(code: str, program_args: list[str] | None = None, debug: bool = Fal
 
     executor = Executor(
         extensions=[BuiltinExtension()],
-        stateful_extensions=[GlobalVariableBppExtension, DiscordStubExtension],
+        stateful_extensions=[BrainGlobalExtension, BrainUserExtension, DiscordStubExtension],
         program_args=program_args or [],
     )
     result = executor.execute(parser_res.nodes)
