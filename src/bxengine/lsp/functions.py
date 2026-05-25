@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from functools import lru_cache
 
+from bxengine.docs import build_signature_from_docstring
 from bxengine.docs import get_docs
 from bxengine.runtime.extensions.BxeExtension import BxeExtensionBase
 from bxengine.runtime.extensions.BxeExtension import GlobalVariableBppExtension
@@ -38,8 +39,8 @@ def _iter_extension_functions(
         primary = str(getattr(attr, "_bpp_function_name", attr_name)).upper()
         aliases = tuple(str(alias).upper() for alias in getattr(attr, "_bpp_function_aliases", ()))
         is_node_transformer = bool(getattr(attr, "_node_transformer", False))
-        signature = _build_signature(attr, primary, is_node_transformer)
         raw_doc = docs_by_attr_name.get(attr_name) or inspect.getdoc(attr)
+        signature = build_signature_from_docstring(primary, raw_doc)
         documentation_markdown = _format_docstring_markdown(raw_doc)
 
         seen_names: set[str] = set()
@@ -181,21 +182,6 @@ def _format_docstring_markdown(raw_doc: str | None) -> str | None:
         parts.append("**Notes**\n" + "\n".join(f"- {item}" for item in notes))
 
     return "\n\n".join(part for part in parts if part).strip() or None
-
-
-def _build_signature(func: object, display_name: str, is_node_transformer: bool) -> str:
-    if is_node_transformer:
-        return f"[{display_name} ...]"
-
-    sig = inspect.signature(func)
-    arg_names = [
-        p.name
-        for p in sig.parameters.values()
-        if p.name != "context"
-    ]
-    if not arg_names:
-        return f"[{display_name}]"
-    return f"[{display_name} {' '.join(arg_names)}]"
 
 
 @lru_cache(maxsize=1)

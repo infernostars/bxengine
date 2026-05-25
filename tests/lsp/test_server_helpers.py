@@ -53,7 +53,7 @@ def test_function_doc_markdown_uses_clean_sections_without_prefixes():
 
     if_info = next(entry for entry in catalog if entry.name == "IF")
     if_doc = _function_doc_markdown(if_info)
-    assert if_doc.startswith("`[IF ...]`")
+    assert if_doc.startswith("`[IF condition true false?]`")
     assert "Special form (node-transformer)" not in if_doc
 
 
