@@ -17,7 +17,12 @@ def get_docs(ext: type[BxeExtensionBase]) -> dict[str, str]:
         if attr is None:
             continue
         if callable(attr) and getattr(attr, "_is_bpp_function", False):
-            ext_docs[attr_name] = attr.__doc__
+            names = []
+            names += getattr(attr, "_bpp_function_name", "Unknown")
+            for alias in getattr(attr, "_bpp_function_aliases", ()):
+                names += alias
+            for name in names:
+                ext_docs[name] = attr.__doc__
     return ext_docs
 
 
