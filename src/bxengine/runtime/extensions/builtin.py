@@ -46,6 +46,12 @@ def _is_whole(v: Any) -> bool:
 def _to_number(v: Any) -> int | float:
     return int(v) if _is_whole(v) else float(v)
 
+def _equal_repr(v: Any) -> int | str | list:
+    if _is_number(v):
+        return str(float(v))
+    elif v is int or v is float:
+        return str(v)
+    return v
 
 def _validate_variable_name(name: str) -> None:
     if not isinstance(name, str):
@@ -80,7 +86,7 @@ class BuiltinExtension(BxeStatelessExtension):
         @parameter condition the minimum of the range, inclusive
         @parameter true the function to be run if the condition is true
         @optional false the function to be run if the condition is false
-        @returns the return value of the selected function, or "" if the condition is false and the false parameter is not supplied"""
+        @returns the return value of the selected function, or "" if the condition is false and the `false` parameter is not supplied"""
         if len(nodes) < 2:
             raise BxeRuntimeSyntaxException("IF expected at least 2 parameters")
         condition = context.executor.evaluate_node(nodes[0], context)
@@ -95,8 +101,8 @@ class BuiltinExtension(BxeStatelessExtension):
     @bpp_function(node_transformer=True)
     def TRY(nodes: list[Node], span: SpanData, context: RuntimeContext):
         """Tries to run the first block. If an error occurs, execution will jump to the second block. Whatever happened before the error will still happen.
-        @parameter a The first block of functions to run. Everything executes until an error is found, in which case it stops and begins running b
-        @parameter b The block to be run if a encounters an error.
+        @parameter a The first block of functions to run. Everything executes until an error is found, in which case it stops and begins running `b`
+        @parameter b The block to be run if `a` encounters an error.
         @returns the return value of the first block if it doesn't error, otherwise that of the second block"""
         if len(nodes) != 2:
             raise BxeRuntimeSyntaxException("TRY expected 2 parameters")
@@ -124,6 +130,12 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function(node_transformer=True)
     def LOOP(nodes: list[Node], span: SpanData, context: RuntimeContext) -> str:
+        """Loop a block of code repeatedly.
+        @parameter amount the amount of times to loop
+        @parameter code the block to be looped
+        @returns the return value of all loops concatenated together
+        @note you may only loop 1024 times total during a program
+        @example [LOOP 10 [RANDINT 0 5]] -> 2013404123"""
         if len(nodes) != 2:
             raise BxeRuntimeSyntaxException("LOOP expected 2 parameters")
 
@@ -179,6 +191,11 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function(node_transformer=True)
     def MACRO(nodes: list[Node], span: SpanData, context: RuntimeContext) -> str:
+        """Create a macro that can be called with [@macro params].
+        @parameter name the name of the macro
+        @parameter params an array of the names of parameters for the macro. You may add ? to the end of a name to mark it as optional. Optional parameters must come after required ones; you can also add ... to the end to allow any number of extra arguments.
+        @parameter block the code that the macro will run
+        @returns nothing"""
         if len(nodes) != 3:
             raise BxeRuntimeSyntaxException("MACRO expected 3 parameters")
 
@@ -230,6 +247,10 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function(node_transformer=True)
     def CALL(nodes: list[Node], span: SpanData, context: RuntimeContext) -> Any:
+        """Call the function or macro `a` with the array `b` as arguments
+        @parameter a the function or macro to be executed
+        @parameter b an array of arguments to use for the function or macro
+        @returns the return value of the function or macro"""
         if len(nodes) != 2:
             raise BxeRuntimeSyntaxException("CALL expected 2 parameters")
         target_value = context.executor.evaluate_node(nodes[0], context)
@@ -267,6 +288,10 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function(node_transformer=True, aliases=["PARAM"])
     def PARAMS(nodes: list[Node], span: SpanData, context: RuntimeContext) -> Any:
+        """May only be used inside a macro. Get one of the parameters of the macro
+        If `a` is not provided, returns an array containing all parameters
+        @parameter a the name of the argument to retrieve
+        @returns the parameter(s) specified"""
         if len(nodes) > 1:
             raise BxeRuntimeSyntaxException("PARAMS expected 0 or 1 parameter")
         if not context.macro_param_stack:
@@ -288,6 +313,9 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def EXCEPTION(detail: str, context: RuntimeContext):
+        """May only be used in the second block of a TRY block. Gets the exception caused during the execution of the first block.
+        @parameter detail a string. "type" will return the exception type (e.g. "NameError"), while "detail" will return the details (e.g. "Function INVALID does not exist")
+        @returns see above."""
         if context.last_exception is None:
             raise BxeRuntimeException("Cannot get the exception outside a TRY block")
         match detail.lower():
@@ -308,7 +336,7 @@ class BuiltinExtension(BxeStatelessExtension):
         """Compares 2 items.
         @parameter a the first item to compare
         @parameter op the operation to use. can be >, <, >=, <=, !=, =, ==, "and", or "or".
-        @parameter b the second item to compare. Must be the same type as a
+        @parameter b the second item to compare. Must have the same type as `a`
         @returns the result of the comparison, as 0 if false and 1 if true"""
         operations = [">", "<", ">=", "<=", "!=", "=", "==", "and", "or"]
         if b not in operations:
@@ -343,6 +371,9 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def THROW(a: Any) -> None:
+        """Throw an exception and stop executing the program
+        @parameter exception the details of the exception
+        @returns nothing"""
         raise ProgramDefinedException(a)
 
     # ========================= Variables =========================
@@ -350,6 +381,10 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def DEFINE(name: str, value: Any, context: RuntimeContext) -> str:
+        """Defines or changes a variable.
+        @parameter name the name of the variable. Can only contain letters, numbers, and underscores, and cannot start with a number
+        @parameter value the value to be assigned to the variable
+        @returns nothing"""
         _validate_variable_name(name)
         if len(str(value)) > 100_000:
             raise MemoryError(
@@ -362,6 +397,9 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def VAR(name: str, context: RuntimeContext) -> Any:
+        """Get the value of a variable.
+        @parameter name the name of the variable
+        @returns the value of the variable"""
         _validate_variable_name(name)
         if name not in context.local_variables:
             raise NameError(f"No variable by the name {_safe_cut(name)} defined")
@@ -372,6 +410,10 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function(aliases=["ARG"])
     def ARGS(index: Any = None, context: RuntimeContext = None) -> Any:
+        """Get one of the arguments provided for the program.
+        If `a` is not provided, returns an array containing all arguments.
+        @parameter a an integer index into the list of arguments provided. Zero-indexed (the first is 0)
+        @returns the argument(s) specified"""
         if index is None:
             return context.program_args
         if not _is_whole(index):
@@ -384,6 +426,10 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def SETARGS(*args: Any, context: RuntimeContext) -> str:
+        """Change the arguments provided for the program.
+        @parameter a if only this parameter is provided (must be an array), the arguments will be changed to this.
+        @optional ... set the arguments to each provided parameter (with `a` as the first)
+        @returns nothing"""
         if len(args) == 1 and isinstance(args[0], list):
             context.program_args = list(args[0])
         else:
@@ -490,7 +536,7 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def RANDINT(a: Any, b: Any) -> int:
-        """Generates a random integer number between a and b, including a but not b
+        """Generates a random integer number between `a` and `b`, including `a` but not `b`
         @parameter a the minimum of the range, inclusive
         @parameter b the maximum of the range, exclusive
         @returns the random number"""
@@ -506,7 +552,7 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def RANDOM(a: Any, b: Any) -> float:
-        """Generates a random number between a and b
+        """Generates a random number between `a` and `b`
         @parameter a the minimum of the range
         @parameter b the maximum of the range
         @returns the random number"""
@@ -521,7 +567,7 @@ class BuiltinExtension(BxeStatelessExtension):
     def FLOOR(a: Any) -> int:
         """Returns the floor of a number; the part before the decimal point
         @parameter a the number to be floored
-        @returns the floor of a"""
+        @returns the floor of `a`"""
         if not _is_number(a):
             raise ValueError(f"FLOOR function parameter is not a number: {_safe_cut(a)}")
         return math.floor(float(a))
@@ -531,7 +577,7 @@ class BuiltinExtension(BxeStatelessExtension):
     def CEIL(a: Any) -> int:
         """Returns the ceiling of a number; the smallest whole number greater or equal to it
         @parameter a the number to be ceiled
-        @returns the ceil of a"""
+        @returns the ceil of `a`"""
         if not _is_number(a):
             raise ValueError(f"CEIL function parameter is not a number: {_safe_cut(a)}")
         return math.ceil(float(a))
@@ -554,7 +600,7 @@ class BuiltinExtension(BxeStatelessExtension):
     def ABS(a: Any) -> int | float:
         """Returns the absolute value of a number (the number made positive if it was negative, otherwise unchanged)
         @parameter a the number to use
-        @returns the absolute value of a"""
+        @returns the absolute value of `a`"""
         if not _is_number(a):
             raise ValueError(f"Parameter of ABS function must be a number: {_safe_cut(a)}")
         return abs(int(a) if _is_whole(a) else float(a))
@@ -562,10 +608,10 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def MOD(a: Any, b: Any) -> int | float:
-        """Returns the remainder ("modulo") of dividing a by b
+        """Returns the remainder ("modulo") of dividing `a` by `b`
         @parameter a the number to be divided
         @parameter b the number to divide by
-        @returns the modulo of a and b"""
+        @returns the modulo of `a` and `b`"""
         if not _is_number(a):
             raise ValueError(f"First parameter of MOD function is not a number: {_safe_cut(a)}")
         if not _is_number(b):
@@ -579,7 +625,7 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def LOG(a: Any, b: Any) -> float:
-        """Returns the logarithm of a base b, or the natural logarithm of a if b is omitted
+        """Returns the logarithm of `a` base `b`, or the natural logarithm of `a` if `b` is omitted
         @parameter a the number to take the logarithm of
         @parameter b the base of the logarithm; defaults to e
         @returns the logarithm"""
@@ -594,9 +640,9 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def FACTORIAL(a: Any) -> float:
-        """Returns the factorial of a (a * a-1 * a-2 ... 2 * 1)
+        """Returns the factorial of `a` (`a * a-1 * a-2 ... 2 * 1`)
         @parameter a the number to take the factorial of
-        @returns the factorial of a
+        @returns the factorial of `a`
         @note this function also works for fractional and (most) negative values (using the equivalent Γ(x+1))"""
         if not _is_number(a):
             raise ValueError(f"FACTORIAL function parameter is not a number: {_safe_cut(a)}")
@@ -610,9 +656,9 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def SIN(a: Any) -> float:
-        """Returns the sine of a
+        """Returns the sine of `a`
         @parameter a the number to take the sine of
-        @returns the sine of a"""
+        @returns the sine of `a`"""
         if not _is_number(a):
             raise ValueError(f"SIN function parameter is not a number: {_safe_cut(a)}")
         return math.sin(float(a))
@@ -620,9 +666,9 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def COS(a: Any) -> float:
-        """Returns the cosine of a
+        """Returns the cosine of `a`
         @parameter a the number to take the cosine of
-        @returns the cosine of a"""
+        @returns the cosine of `a`"""
         if not _is_number(a):
             raise ValueError(f"COS function parameter is not a number: {_safe_cut(a)}")
         return math.cos(float(a))
@@ -630,9 +676,9 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def TAN(a: Any) -> float:
-        """Returns the tangent of a
+        """Returns the tangent of `a`
         @parameter a the number to take the tangent of
-        @returns the tangent of a"""
+        @returns the tangent of `a`"""
         if not _is_number(a):
             raise ValueError(f"TAN function parameter is not a number: {_safe_cut(a)}")
         return math.tan(float(a))
@@ -640,7 +686,7 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def MIN(a: list) -> Any:
-        """Returns the minimum value in the array a
+        """Returns the minimum value in the array `a`
         This is the lowest number if all values in the array are numbers, otherwise the lexicographically earliest
         ("15" < "2" < "aeiou" < "zyxxy")
         @parameter a the array to find the minimum value of
@@ -654,7 +700,7 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def MAX(a: list) -> Any:
-        """Returns the maximum value in the array a
+        """Returns the maximum value in the array `a`
         This is the highest number if all values in the array are numbers, otherwise the lexicographically last
         ("15" < "2" < "aeiou" < "zyxxy")
         @parameter a the array to find the maximum value of
@@ -669,22 +715,28 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def UPPER(a: str):
-        """Returns the string s in all uppercase
+        """Returns the string `s` in all uppercase
         @parameter s the input string
-        @returns s in all-caps"""
+        @returns `s` in all-caps"""
         return a.upper()
 
     @staticmethod
     @bpp_function()
     def LOWER(a: str):
-        """Returns the string s in all lowercase
+        """Returns the string `s` in all lowercase
         @parameter s the input string
-        @returns s in lowercase"""
+        @returns `s` in lowercase"""
         return a.lower()
 
     @staticmethod
     @bpp_function()
     def STRIP(a: str, side: str | None = None, chars: str | None = None):
+        """Strips whitespace or other characters from the sides of a string.
+        If chars is provided, characters will be stripped from the edge until a character not in the list is found
+        @parameter s the input string
+        @optional side the side(s) to strip. can be "both" (default), "right", or "left"
+        @optional chars a string containing the characters to strip
+        @returns the stripped string"""
         side = side if side is not None else "both"
         side = side.lower()
         match side:
@@ -701,7 +753,7 @@ class BuiltinExtension(BxeStatelessExtension):
     @bpp_function()
     def CONCAT(*args: Any) -> str | list:
         """Concatenates its inputs together
-        @parameter ... (multiple) arrays to join together, or other items to concatenate as strings
+        @parameter ... arrays to join together, or other items to concatenate as strings
         @returns the joined array or string"""
         all_type = None
         for a in args:
@@ -721,7 +773,7 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def SPLIT(a: Any, b: Any) -> list:
-        """Splits the string s by b
+        """Splits the string `s` by `b`
         @parameter s the string to be split
         @parameter b the separator to split the string by
         @returns an array containing the split parts of the string
@@ -735,11 +787,11 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def REPLACE(a: Any, b: Any, c: Any) -> str:
-        """Replaces all instances of b in the string s with c
+        """Replaces all instances of `b` in the string `s` with `c`
         @parameter s the string
         @parameter b the substring to replace
-        @Parameter c the string to replace every instance of b with
-        @returns the string s with replacements made"""
+        @Parameter c the string to replace every instance of `b` with
+        @returns the string `s` with replacements made"""
         if isinstance(a, list):
             raise TypeError(f"Parameter of REPLACE function cannot be an array: {_safe_cut(a)}")
         return str(a).replace(str(b), str(c))
@@ -747,9 +799,9 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def LENGTH(a: Any) -> int:
-        """Returns the length of a as either a string or array
+        """Returns the length of `a` as either a string or array
         @parameter a the string or array
-        @returns the number of characters in the string a, or the number of items in the array a"""
+        @returns the number of characters in the string `a`, or the number of items in the array `a`"""
         if isinstance(a, (int, float)):
             a = str(a)
         return len(a)
@@ -757,12 +809,12 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def INDEXOF(a: Any, b: Any, c: Any = None, d: Any = None) -> int | str:
-        """Finds the index of b in the array a
+        """Finds the index of `b` in the array `a`
         @parameter a the array to search in
         @parameter b the item to find
         @optional c the index to start searching at
         @optional d the index to finish searching at
-        @returns the index of b in a (after c and before d, if applicable)"""
+        @returns the index of `b` in `a` (after `c` and before `d`, if applicable)"""
         if c is not None and not _is_number(c) and not isinstance(c, str):
             raise TypeError(
                 f"Optional third parameter of INDEXOF function must be a number: {_safe_cut(c)}"
@@ -789,22 +841,22 @@ class BuiltinExtension(BxeStatelessExtension):
             raise TypeError(
                 f"First parameter of INDEXOF function must be an array or string: {_safe_cut(a)}"
             )
-        a_str = [str(i) for i in a]
+        a_str = [_equal_repr(i) for i in a]
         try:
             if c is not None:
                 sliced = a_str[c:d] if d is not None else a_str[c:]
-                return sliced.index(str(b))
-            return a_str.index(str(b))
+                return sliced.index(_equal_repr(b))
+            return a_str.index(_equal_repr(b))
         except (ValueError, IndexError):
             return ""
 
     @staticmethod
     @bpp_function()
     def JOIN(a: list, b: str = "") -> str:
-        """Joins the elements of a as strings using b as a separator.
+        """Joins the elements of `a` as strings using `b` as a separator.
         @parameter a the list to join together
         @parameter b the separator to use
-        @returns a string containing the elements of a joined together with b
+        @returns a string containing the elements of `a` joined together with `b`
         @example [JOIN [ARRAY a b 1.5] ;] -> a;b;1.5
         """
         if not isinstance(a, list):
@@ -816,6 +868,12 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def SETINDEX(a: str | list, b: int, c: Any) -> str | list:
+        """Returns a string or array with one item changed
+        @parameter a the string or array to be changed
+        @parameter b the index into `a` to change
+        @parameter c what the item at index `b` of `a` should be set to
+        @returns `a` with the item at index `b` set to `c`
+        """
         if not _is_whole(b):
             raise ValueError(f"SETINDEX function parameter is not an integer: {_safe_cut(b)}")
         idx = int(b)
@@ -846,9 +904,9 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def UNICODE(a: Any) -> int:
-        """Finds the unicode codepoint for a character.
+        """Finds the Unicode codepoint for a character
         @parameter c a single-character string
-        @returns the codepoint of c as an integer
+        @returns the codepoint of `c` as an integer
         """
         if len(str(a)) != 1:
             raise ValueError(f"UNICODE function parameter is not a character: {_safe_cut(a)}")
@@ -857,9 +915,9 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def CHOOSECHAR(a: str, *_args: Any) -> str:
-        """Chooses a random character of the string s.
+        """Chooses a random character of the string `s`.
         @parameter s the string to use
-        @returns a randomly chosen character of s
+        @returns a randomly chosen character of `s`
         """
         if not isinstance(a, str):
             raise ValueError(f"CHOOSECHAR function parameter is not a string: {_safe_cut(a)}")
@@ -871,13 +929,18 @@ class BuiltinExtension(BxeStatelessExtension):
     @bpp_function()
     def ARRAY(*args: Any) -> list:
         """Creates a new array.
-        @parameter ... (multiple) items that will be part of the array. Can be empty
+        @parameter ... items that will be part of the array. Can be empty
         @returns an array created from the items given"""
         return list(args)
 
     @staticmethod
     @bpp_function()
     def INDEX(a: str | list, b: int) -> Any:
+        """Indexes into a string or array. Always zero-indexed (index 0 is the first item/character)
+        Negative indexes can be used (-1 is the last item, -2 the second-to-last, etc.)
+        @parameter a the string or array to be indexed into
+        @parameter b the index to use
+        @returns the `b`-th item of the array `a`, or `b`-th character of the string `a`"""
         if not _is_whole(b):
             raise TypeError(f"Second parameter of INDEX function must be an integer: {_safe_cut(b)}")
         return a[b]
@@ -885,6 +948,15 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def SLICE(a: str | list, b: int | None = None, c: int | None = None, d: int | None = None) -> str | list:
+        """Returns a portion of a string or array
+        @parameter a the string or array to be sliced
+        @optional b the start of the slice
+        @optional c the end of the slice; the character at this index will not be included
+        @optional d the step; 2 will only contain every other item, 3 every third item, and -1 will go backwards
+        @returns the sliced string/array
+        @example [SLICE "hello world" 0 5] -> hello
+        @example [SLICE "hello world" "" -3] -> hello wo
+        @example [SLICE "-h-e-l-l-o" 1 "" 2] -> hello"""
         if b is not None and not _is_whole(b):
             raise TypeError(f"Second parameter of SLICE function must be an integer: {_safe_cut(b)}")
         if c is not None and not _is_whole(c):
@@ -908,7 +980,7 @@ class BuiltinExtension(BxeStatelessExtension):
     def SHUFFLE(a: list) -> list:
         """Randomly shuffles the contents of an array
         @parameter a the array to shuffle
-        @returns an array containing the items of a in a random order"""
+        @returns an array containing the items of `a` in a random order"""
         if not isinstance(a, list):
             raise ValueError(f"SHUFFLE function parameter is not a list: {_safe_cut(a)}")
         return random.sample(a, k=len(a))
@@ -930,9 +1002,9 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def CHOOSE(*args: Any) -> Any:
-        """Randomly chooses between items in an array, or between the arguments of the function.
+        """Randomly chooses between items in an array, or between the arguments of the function
         @parameter a an array of items
-        @optional ... (multiple) more items to choose between; if supplied, a will be treated as a single item
+        @optional ... more items to choose between; if supplied, `a` will be treated as a single item
         @returns a randomly selected item from the array or items supplied."""
         if len(args) == 1:
             args = args[0]
@@ -945,10 +1017,10 @@ class BuiltinExtension(BxeStatelessExtension):
     @staticmethod
     @bpp_function()
     def REPEAT(a: str | list, b: int) -> str | list:
-        """Repeats the contents a string or array.
-        @parameter a the array or string to be repeated.
-        @parameter b the amount of times to repeat a.
-        @returns the characters of the string a or elements of the array a, repeated b times."""
+        """Repeats the contents of a string or array
+        @parameter a the array or string to be repeated
+        @parameter b the amount of times to repeat `a`
+        @returns the characters of the string `a` or elements of the array `a`, repeated `b` times"""
         if not _is_whole(b):
             raise ValueError(f"Second parameter of REPEAT function is not an integer: {_safe_cut(b)}")
         if not isinstance(a, list):
@@ -966,7 +1038,8 @@ class BuiltinExtension(BxeStatelessExtension):
     def TYPE(a: Any) -> str:
         """Gets the data type of the input.
         Can be str, int, float, or list.
-        @returns the value to get the type of."""
+        @parameter a the value to get the type of
+        @returns the type of `a`"""
         if _is_whole(a):
             return "int"
         if _is_number(a):

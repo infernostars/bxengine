@@ -84,6 +84,7 @@ def _format_docstring_markdown(raw_doc: str | None) -> str | None:
     lines = inspect.cleandoc(raw_doc).splitlines()
     summary: list[str] = []
     params: list[tuple[str, str]] = []
+    optionals: list[tuple[str, str]] = []
     returns: list[str] = []
     raises: list[str] = []
     notes: list[str] = []
@@ -101,7 +102,7 @@ def _format_docstring_markdown(raw_doc: str | None) -> str | None:
             tag = match.group("tag").lower()
             body = (match.group("body") or "").strip()
 
-            if tag == "param":
+            if tag == "parameter":
                 if body:
                     parts = body.split(None, 1)
                     param_name = parts[0]
@@ -110,7 +111,17 @@ def _format_docstring_markdown(raw_doc: str | None) -> str | None:
                     param_name = "param"
                     param_desc = ""
                 params.append((param_name, param_desc))
-                active = ("param", len(params) - 1)
+                active = ("parameter", len(params) - 1)
+            elif tag == "optional":
+                if body:
+                    parts = body.split(None, 1)
+                    param_name = parts[0]
+                    param_desc = parts[1] if len(parts) > 1 else ""
+                else:
+                    param_name = "param"
+                    param_desc = ""
+                optionals.append((param_name, param_desc))
+                active = ("optional", len(params) - 1)
             elif tag in {"return", "returns"}:
                 returns.append(body)
                 active = ("returns", len(returns) - 1)
@@ -133,6 +144,9 @@ def _format_docstring_markdown(raw_doc: str | None) -> str | None:
         if section == "param":
             name, desc = params[index]
             params[index] = (name, f"{desc} {stripped}".strip())
+        if section == "optional":
+            name, desc = optionals[index]
+            optionals[index] = (name, f"{desc} {stripped}".strip())
         elif section == "returns":
             _extend_last(returns, stripped)
         elif section == "raises":
@@ -145,12 +159,16 @@ def _format_docstring_markdown(raw_doc: str | None) -> str | None:
     parts: list[str] = []
     if summary:
         parts.append(" ".join(summary))
-    if params:
+    if params or optionals:
         parts.append(
             "**Parameters**\n"
             + "\n".join(
                 f"- `{name}`: {desc}" if desc else f"- `{name}`"
                 for name, desc in params
+            )
+            + "\n".join(
+                f"- `{name}`?: {desc}" if desc else f"- `{name}`"
+                for name, desc in optionals
             )
         )
     if returns:
