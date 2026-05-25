@@ -134,7 +134,7 @@ class BuiltinExtension(BxeStatelessExtension):
         @parameter amount the amount of times to loop
         @parameter code the block to be looped
         @returns the return value of all loops concatenated together
-        @note you may only loop 1024 times total during a program
+        @note you may only loop 4096 times total during a program
         @example [LOOP 10 [RANDINT 0 5]] -> 2013404123"""
         if len(nodes) != 2:
             raise BxeRuntimeSyntaxException("LOOP expected 2 parameters")
