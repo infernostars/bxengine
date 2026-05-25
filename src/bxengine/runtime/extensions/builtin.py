@@ -841,6 +841,17 @@ class BuiltinExtension(BxeStatelessExtension):
             raise TypeError(
                 f"First parameter of INDEXOF function must be an array or string: {_safe_cut(a)}"
             )
+
+        # Strings should be searched as strings so substring lookups work.
+        if isinstance(a, str):
+            try:
+                if c is not None:
+                    sliced = a[c:d] if d is not None else a[c:]
+                    return sliced.index(str(b))
+                return a.index(str(b))
+            except (ValueError, IndexError):
+                return ""
+
         a_str = [_equal_repr(i) for i in a]
         try:
             if c is not None:
