@@ -18,9 +18,9 @@ def get_docs(ext: type[BxeExtensionBase]) -> dict[str, str]:
             continue
         if callable(attr) and getattr(attr, "_is_bpp_function", False):
             names = []
-            names += getattr(attr, "_bpp_function_name", "Unknown")
+            names.append(getattr(attr, "_bpp_function_name", "Unknown"))
             for alias in getattr(attr, "_bpp_function_aliases", ()):
-                names += alias
+                names.append(alias)
             for name in names:
                 ext_docs[name] = attr.__doc__
     return ext_docs
