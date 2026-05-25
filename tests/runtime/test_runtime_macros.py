@@ -116,10 +116,9 @@ class TestMacros:
 
         assert isinstance(res, ExecutorResult.Success)
 
-
     def test_macro_nested_call_counter_exceeded_without_extra_depth(self):
         # Counter-based cap should apply even when nesting depth stays shallow.
-        code = '[MACRO "inner" [ARRAY] "x"] [MACRO "outer" [ARRAY] [LOOP 2048 [@inner]]] [@outer] [@outer] [@outer]'
+        code = '[MACRO "inner" [ARRAY] "x"] [MACRO "outer" [ARRAY] [LOOP 2048 [@inner]]] [MACRO "outer2" [ARRAY] [@inner]] [@outer] [@outer] [@outer2]'
         res = run_program_raw(code)
         assert isinstance(res, ExecutorResult.Error)
         assert isinstance(res.exception, BxeRuntimeException)
