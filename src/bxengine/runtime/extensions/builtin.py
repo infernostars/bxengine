@@ -756,18 +756,22 @@ class BuiltinExtension(BxeStatelessExtension):
         @parameter ... arrays to join together, or other items to concatenate as strings
         @returns the joined array or string"""
         all_type = None
+        _args = []
         for a in args:
             if isinstance(a, (int, float)):
                 a = str(a)
             if all_type is None:
                 all_type = type(a)
             elif type(a) is not all_type:
+                if isinstance(a, str) and a == "":
+                    continue
                 raise TypeError("CONCAT parameters must either be all arrays or all strings")
+            _args.append(a)
         if all_type is str:
-            return "".join(str(a) for a in args)
+            return "".join(str(a) for a in _args)
         if all_type is list:
             import itertools
-            return list(itertools.chain(*args))
+            return list(itertools.chain(*_args))
         raise IndexError("Cannot call CONCAT function with no arguments")
 
     @staticmethod
