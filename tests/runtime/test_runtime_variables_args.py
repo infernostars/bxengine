@@ -22,6 +22,20 @@ class TestVariables:
     def test_define_overwrite(self):
         assert run_program('[DEFINE x 1] [DEFINE x 2] [VAR x]') == "  2"
 
+    def test_extra_var_argument_does_not_replace_context(self):
+        res = run_program_raw("[DEFINE x 1] [VAR x extra]")
+        assert isinstance(res, ExecutorResult.Error)
+        assert isinstance(res.exception, TypeError)
+        assert not isinstance(res.exception, AttributeError)
+        assert "expected at most 1 parameters, but got 2" in str(res.exception)
+
+    def test_extra_define_argument_does_not_replace_context(self):
+        res = run_program_raw("[DEFINE x 1 extra]")
+        assert isinstance(res, ExecutorResult.Error)
+        assert isinstance(res.exception, TypeError)
+        assert not isinstance(res.exception, AttributeError)
+        assert "expected at most 2 parameters, but got 3" in str(res.exception)
+
 
 class TestArgs:
     def test_args_by_index(self):

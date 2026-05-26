@@ -96,7 +96,8 @@ def _scan_extension(ext: BxeExtensionBase) -> list[tuple[str, FunctionEntry]]:
                     if (ann is inspect.Parameter.empty or ann is Any or ann is object)
                     else ann
                 )
-                for ann in parameter_annotations
+                for p, ann in zip(parameters, parameter_annotations)
+                if p.name != "context"
             )
             context_parameter_index = next(
                 (i for i, p in enumerate(parameters) if p.name == "context"),
@@ -376,9 +377,19 @@ class Executor:
         if entry.context_parameter_kind is inspect.Parameter.KEYWORD_ONLY:
             return args, {"context": context}
 
-        if len(args) <= context_idx:
-            return args, {"context": context}
-        return args, {}
+        if entry.context_parameter_kind is inspect.Parameter.POSITIONAL_ONLY:
+            final_args = list(args)
+            final_args.insert(context_idx, context)
+            return final_args, {}
+
+        if len(args) > context_idx:
+            function_name = getattr(entry.func, "__name__", "function").upper()
+            raise TypeError(
+                f"{function_name} expected at most {context_idx} parameters, "
+                f"but got {len(args)}"
+            )
+
+        return args, {"context": context}
 
     @staticmethod
     def _parse_number(value: str) -> str:
