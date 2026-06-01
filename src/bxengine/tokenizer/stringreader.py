@@ -64,7 +64,10 @@ class StringReader:
                 cursor += 1  # consume backslash
                 if cursor >= length:
                     break
-                result.append(string[cursor])  # include escaped char literally
+                if string[cursor] == "n":
+                    result.append("\n")
+                else:
+                    result.append(string[cursor])  # include escaped char literally
                 cursor += 1
                 continue
             result.append(c)
@@ -85,7 +88,10 @@ class StringReader:
             c = string[cursor]
 
             if escaped:
-                out.append(c)
+                if string[cursor] == "n":
+                    out.append("\n")
+                else:
+                    out.append(c)
                 cursor += 1
                 escaped = False
                 continue
