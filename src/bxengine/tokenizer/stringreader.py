@@ -88,7 +88,7 @@ class StringReader:
             c = string[cursor]
 
             if escaped:
-                if string[cursor] == "n":
+                if c == "n":
                     out.append("\n")
                 else:
                     out.append(c)
@@ -135,7 +135,10 @@ class StringReader:
             c = string[cursor]
             cursor += 1
             if escaped:
-                result.append(c)
+                if c == "n":
+                    result.append("\n")
+                else:
+                    result.append(c)
                 escaped = False
             elif c == '\\':
                 escaped = True
