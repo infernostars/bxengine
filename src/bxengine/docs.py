@@ -215,7 +215,7 @@ def format_docstring_markdown(
         parts.append("**Aliases**\n" + ", ".join(f"`{alias}`" for alias in visible_aliases))
 
     if parsed.summary:
-        parts.append(" ".join(parsed.summary))
+        parts.append("\n".join(parsed.summary))
     if parsed.parameters or parsed.optional_parameters:
         param_lines = [
             f"- `{name}`: {desc}" if desc else f"- `{name}`"
