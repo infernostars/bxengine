@@ -10,6 +10,7 @@ def bpp_function(
     name: str | None = None,
     node_transformer: bool = False,
     aliases: list[str] | tuple[str, ...] | str | None = None,
+    category: str | None = None,
 ):
     """
     Annotates a function as available in the runtime.
@@ -26,6 +27,7 @@ def bpp_function(
         func._node_transformer = node_transformer
         func._bpp_function_name = name if name is not None else func.__name__
         func._bpp_function_aliases = alias_tuple
+        func._bpp_function_category = category
         return func
     return decorator
 

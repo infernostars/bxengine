@@ -39,6 +39,26 @@ def test_function_catalog_contains_core_functions():
     assert "Generates a random integer" in randint.documentation_markdown
     assert "**Parameters**" in randint.documentation_markdown
     assert "**Returns**" in randint.documentation_markdown
+    assert randint.category == "Math"
+    assert "**Category**\nMath" in randint.documentation_markdown
+
+
+def test_function_catalog_tracks_alias_metadata():
+    catalog = get_function_catalog()
+    params = next(entry for entry in catalog if entry.name == "PARAMS")
+    param_alias = next(entry for entry in catalog if entry.name == "PARAM")
+
+    assert params.category == "Control Flow"
+    assert params.aliases == ("PARAM",)
+    assert not params.is_alias
+    assert param_alias.is_alias
+    assert param_alias.alias_of == "PARAMS"
+    assert param_alias.primary_name == "PARAMS"
+    assert param_alias.signature == "[PARAM a]"
+
+    alias_doc = _function_doc_markdown(param_alias)
+    assert "`PARAM` is an alias for `PARAMS`" in alias_doc
+    assert "**Aliases**" not in alias_doc
 
 
 def test_function_doc_markdown_uses_clean_sections_without_prefixes():

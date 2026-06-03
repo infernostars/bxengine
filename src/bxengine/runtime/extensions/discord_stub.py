@@ -6,6 +6,8 @@ from bxengine.runtime.extensions.BxeExtension import BxeStatefulExtension, bpp_f
 
 
 class DiscordStubExtension(BxeStatefulExtension):
+    _bpp_function_category = "Discord"
+
     def __init__(self, runner: Any = None, channel: Any = None):
         self._runner = runner
         self._channel = channel
@@ -42,6 +44,8 @@ class DiscordStubExtension(BxeStatefulExtension):
 
 
 class BrainGlobalExtension(BxeStatefulExtension):
+    _bpp_function_category = "Global Variables"
+
     def __init__(self, author: Any = None):
         self._author = str(author) if author is not None else ""
         self.global_variables: dict[str, Any] = {}
@@ -78,6 +82,8 @@ class BrainGlobalExtension(BxeStatefulExtension):
 
 
 class BrainUserExtension(BxeStatefulExtension):
+    _bpp_function_category = "User Variables"
+
     def __init__(self, author: Any = None, runner: Any = None):
         self._author = str(author) if author is not None else ""
         if runner is not None and hasattr(runner, "id"):
