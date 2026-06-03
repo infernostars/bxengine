@@ -1068,7 +1068,7 @@ class BuiltinExtension(BxeStatelessExtension):
         return time.time()
 
     @staticmethod
-    @bpp_function(name="#", aliases=["VOID"], category="Utility")
+    @bpp_function(name="VOID", aliases=["#"], category="Utility")
     def VOID(*_args: Any) -> str:
         """Returns nothing
         @optional function the function to be run. Will be executed, but its output discarded
