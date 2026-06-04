@@ -25,3 +25,7 @@ class ProgramDefinedException(BxeRuntimeException):
 
 class BxeRuntimeSyntaxException(BxeRuntimeException):
     pass
+
+
+class BxeRecursionException(BxeRuntimeException):
+    pass

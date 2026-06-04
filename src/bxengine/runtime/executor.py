@@ -5,7 +5,7 @@ import types
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional, get_origin, get_args, Union
 
-from bxengine.exceptions import BxeRuntimeException
+from bxengine.exceptions import BxeRuntimeException, BxeRecursionException
 from bxengine.parsing.nodes import Node, Nodes
 from bxengine.runtime.context import RuntimeContext, MacroInvocationFrame, MacroCallableValue
 from bxengine.runtime.extensions.BxeExtension import (
@@ -39,6 +39,12 @@ class ExecutorResult:
     @dataclass(frozen=True)
     class Error:
         exception: Exception
+
+
+@dataclass
+class ExecutorSession:
+    context: RuntimeContext
+    stateful_extensions: list[BxeStatefulExtension] = field(default_factory=list)
 
 
 def _safe_cut(s: Any, num: int = 15) -> str:
@@ -153,7 +159,7 @@ class Executor:
             stateful_extensions or []
         )
 
-    def execute(self, nodes: list[Node]) -> ExecutorResult.Success | ExecutorResult.Error:
+    def create_session(self) -> ExecutorSession:
         functions = dict(self._stateless_functions)
         stateful_instances: list[BxeStatefulExtension] = []
 
@@ -170,7 +176,25 @@ class Executor:
             functions=functions,
         )
 
-        for inst in stateful_instances:
+        return ExecutorSession(
+            context=context,
+            stateful_extensions=stateful_instances,
+        )
+
+    def execute(
+        self, nodes: list[Node]
+    ) -> ExecutorResult.Success | ExecutorResult.Error:
+        return self.execute_in_session(nodes, self.create_session())
+
+    def execute_in_session(
+        self, nodes: list[Node], session: ExecutorSession
+    ) -> ExecutorResult.Success | ExecutorResult.Error:
+        context = session.context
+        context.macro_nested_calls_used = 0
+        context.loop_iterations_used = 0
+        context.callable_call_stack.clear()
+
+        for inst in session.stateful_extensions:
             inst.post_parse_hook(nodes)
 
         output_parts: list[str] = []
@@ -186,7 +210,7 @@ class Executor:
 
         return ExecutorResult.Success(
             output="".join(output_parts),
-            stateful_extensions=stateful_instances,
+            stateful_extensions=session.stateful_extensions,
         )
 
     def _evaluate_function(self, node: Nodes.Function, context: RuntimeContext) -> Any:
@@ -236,7 +260,7 @@ class Executor:
 
             if macro_name in context.macro_call_stack:
                 cycle = " -> ".join((*context.macro_call_stack, macro_name))
-                raise BxeRuntimeException(f"Macro recursion detected: {cycle}")
+                raise BxeRecursionException(f"Macro recursion detected: {cycle}")
 
             required_args = sum(1 for p in macro.parameters if not p.optional)
             max_args = None if macro.supports_varargs else len(macro.parameters)
@@ -256,7 +280,7 @@ class Executor:
             if context.macro_call_stack:
                 projected = context.macro_nested_calls_used + 1
                 if projected > _MACRO_NESTED_CALL_CAP:
-                    raise BxeRuntimeException(
+                    raise BxeRecursionException(
                         "Macro nested call cap exceeded: "
                         f"attempted {projected} nested calls (limit {_MACRO_NESTED_CALL_CAP})"
                     )

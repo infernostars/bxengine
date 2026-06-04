@@ -1,6 +1,7 @@
 from typing import Any
 
 from bxengine.exceptions import (
+    BxeRecursionException,
     BxeRuntimeException,
     BxeRuntimeSyntaxException,
     ProgramDefinedException,
@@ -254,7 +255,7 @@ class ControlFlowExtension(BxeStatelessExtension):
 
             callable_id = id(target_value)
             if callable_id in context.callable_call_stack:
-                raise BxeRuntimeException("Callable recursion detected")
+                raise BxeRecursionException("Callable recursion detected")
             context.callable_call_stack.append(callable_id)
             try:
                 return context.executor.evaluate_node(call_node, context)
