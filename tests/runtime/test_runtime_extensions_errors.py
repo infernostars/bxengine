@@ -26,6 +26,9 @@ class KeywordOnlyContextExtension(BxeStatelessExtension):
 
 
 class TestExtensions:
+    def test_executor_registers_builtins_by_default(self):
+        assert run_program("[MATH 2 + 3]") == "5"
+
     def test_stateless_extension(self):
         exts = [BuiltinExtension(), MyBxeExtension()]
         assert run_program("[test_basic]", extensions=exts) == "1"

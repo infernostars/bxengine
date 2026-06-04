@@ -52,6 +52,104 @@ class TestMacros:
         code = '[MACRO count [ARRAY "a" "..."] [LENGTH [PARAMS]]] [@count 1 2 3 4]'
         assert run_program(code) == " 4"
 
+    def test_macro_callable_parameter_receives_unevaluated_node(self):
+        code = (
+            '[MACRO "twice" [ARRAY "body:callable"] '
+            '[CONCAT [CALL [PARAM body]] [CALL [PARAM body]]]] '
+            '[DEFINE x 0] '
+            '[@twice [CONCAT [DEFINE x [MATH [VAR x] + 1]] [VAR x]]]'
+        )
+        assert run_program(code).strip() == "12"
+
+    def test_macro_optional_callable_parameter(self):
+        code = (
+            '[MACRO "maybe" [ARRAY "body?:callable"] '
+            '[IF [COMPARE [PARAM body] != ""] [CALL [PARAM body]] "missing"]] '
+            '[@maybe]'
+        )
+        assert run_program(code).strip() == "missing"
+
+    def test_macro_callable_parameter_can_be_forwarded_through_call(self):
+        code = (
+            '[MACRO "inner" [ARRAY "body:callable"] [CALL [PARAM body]]] '
+            '[MACRO "outer" [ARRAY "body:callable"] '
+            '[CALL "@inner" [ARRAY [PARAM body]]]] '
+            '[DEFINE x 0] '
+            '[@outer [CONCAT [DEFINE x 1] [VAR x]]]'
+        )
+        assert run_program(code).strip() == "1"
+
+    def test_macro_callable_custom_if_only_runs_true_branch(self):
+        code = (
+            '[MACRO "customif" [ARRAY "condition" "true_branch:callable" "false_branch:callable"] '
+            '[IF [PARAM condition] [CALL [PARAM true_branch]] [CALL [PARAM false_branch]]]] '
+            '[@customif 1 "chosen" [THROW "false branch ran"]]'
+        )
+        assert run_program(code).strip() == "chosen"
+
+    def test_macro_callable_custom_if_only_runs_false_branch(self):
+        code = (
+            '[MACRO "customif" [ARRAY "condition" "true_branch:callable" "false_branch:callable"] '
+            '[IF [PARAM condition] [CALL [PARAM true_branch]] [CALL [PARAM false_branch]]]] '
+            '[@customif 0 [THROW "true branch ran"] "chosen"]'
+        )
+        assert run_program(code).strip() == "chosen"
+
+    def test_macro_non_callable_parameter_still_evaluates_before_body(self):
+        code = (
+            '[MACRO "ignore" [ARRAY "body"] "ok"] '
+            '[@ignore [THROW "ordinary parameter evaluated"]]'
+        )
+        res = run_program_raw(code)
+        assert isinstance(res, ExecutorResult.Error)
+        assert "ordinary parameter evaluated" in str(res.exception)
+
+    def test_call_callable_parameter_can_replace_function_arguments(self):
+        code = (
+            '[MACRO "apply" [ARRAY "body:callable"] '
+            '[CALL [PARAM body] [ARRAY "x" "y"]]] '
+            '[@apply [CONCAT "ignored"]]'
+        )
+        assert run_program(code).strip() == "xy"
+
+    def test_macro_callable_parameter_can_be_called_multiple_times_sequentially(self):
+        code = (
+            '[MACRO "twice" [ARRAY "body:callable"] '
+            '[CONCAT [CALL [PARAM body]] [CALL [PARAM body]]]] '
+            '[@twice "ok"]'
+        )
+        assert run_program(code).strip() == "okok"
+
+    def test_macro_callable_parameter_recursion_is_blocked(self):
+        code = (
+            '[MACRO "run" [ARRAY "body:callable"] [CALL [PARAM body]]] '
+            '[@run [CALL [PARAM body]]]'
+        )
+        res = run_program_raw(code)
+        assert isinstance(res, ExecutorResult.Error)
+        assert isinstance(res.exception, BxeRuntimeException)
+        assert "recursion" in str(res.exception).lower()
+
+    def test_macro_callable_parameter_cannot_be_saved_to_variable(self):
+        code = (
+            '[MACRO "save" [ARRAY "body:callable"] [DEFINE saved [PARAM body]]] '
+            '[@save "body"]'
+        )
+        res = run_program_raw(code)
+        assert isinstance(res, ExecutorResult.Error)
+        assert isinstance(res.exception, TypeError)
+        assert "callable" in str(res.exception).lower()
+
+    def test_macro_callable_parameter_cannot_be_saved_to_variable_inside_array(self):
+        code = (
+            '[MACRO "save" [ARRAY "body:callable"] [DEFINE saved [ARRAY [PARAM body]]]] '
+            '[@save "body"]'
+        )
+        res = run_program_raw(code)
+        assert isinstance(res, ExecutorResult.Error)
+        assert isinstance(res.exception, TypeError)
+        assert "callable" in str(res.exception).lower()
+
     def test_params_returns_all_arguments_without_varargs(self):
         code = '[MACRO count [ARRAY "a" "b?"] [LENGTH [PARAMS]]] [@count 1]'
         assert run_program(code) == " 1"
@@ -88,6 +186,10 @@ class TestMacros:
 
     def test_call_dynamic_macro_name(self):
         code = '[MACRO "thing" [ARRAY "x"] [PARAM x]] [DEFINE target "@thing"] [CALL [VAR target] [ARRAY "ok"]]'
+        assert run_program(code).strip() == "ok"
+
+    def test_call_macro_defaults_missing_arguments_to_empty_array(self):
+        code = '[MACRO "thing" [ARRAY] "ok"] [CALL "@thing"]'
         assert run_program(code).strip() == "ok"
 
     def test_call_unknown_macro_raises(self):

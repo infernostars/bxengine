@@ -9,7 +9,6 @@ from bxengine.runtime.extensions.discord_stub import (
 from bxengine.tokenizer.tokenize import Tokenizer, TokenizationResult
 from bxengine.parsing.parser import Parser, ParsingResult
 from bxengine.runtime.executor import Executor, ExecutorResult
-from bxengine.runtime.extensions.builtin import BuiltinExtension
 from bxengine.syntax_warnings import BxeSyntaxWarning
 
 
@@ -59,7 +58,6 @@ def run_code(code: str, program_args: list[str] | None = None, debug: bool = Fal
         _print_syntax_warnings(parser_res.warnings)
 
     executor = Executor(
-        extensions=[BuiltinExtension()],
         stateful_extensions=[BrainGlobalExtension, BrainUserExtension, DiscordStubExtension],
         program_args=program_args or [],
     )

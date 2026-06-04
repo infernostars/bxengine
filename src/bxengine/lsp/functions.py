@@ -5,7 +5,7 @@ from functools import lru_cache
 
 from bxengine.docs import get_docs
 from bxengine.runtime.extensions.BxeExtension import BxeExtensionBase
-from bxengine.runtime.extensions.builtin import BuiltinExtension
+from bxengine.runtime.extensions.builtin import create_default_builtin_extensions
 from bxengine.runtime.extensions.discord_stub import (
     BrainGlobalExtension,
     BrainUserExtension,
@@ -48,7 +48,7 @@ def _iter_extension_functions(ext: type[BxeExtensionBase]) -> list[FunctionInfo]
 @lru_cache(maxsize=1)
 def get_function_catalog() -> tuple[FunctionInfo, ...]:
     providers: list[BxeExtensionBase] = [
-        BuiltinExtension(),
+        *create_default_builtin_extensions(),
         BrainGlobalExtension(),
         BrainUserExtension(),
         DiscordStubExtension(),

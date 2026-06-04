@@ -7,11 +7,12 @@ from typing import Any, Callable, Optional, get_origin, get_args, Union
 
 from bxengine.exceptions import BxeRuntimeException
 from bxengine.parsing.nodes import Node, Nodes
-from bxengine.runtime.context import RuntimeContext, MacroInvocationFrame
+from bxengine.runtime.context import RuntimeContext, MacroInvocationFrame, MacroCallableValue
 from bxengine.runtime.extensions.BxeExtension import (
     BxeExtensionBase,
     BxeStatefulExtension,
 )
+from bxengine.runtime.extensions.builtin import create_default_builtin_extensions
 from bxengine.spans import SpanData
 
 _MACRO_NESTED_CALL_CAP = 4096
@@ -139,8 +140,12 @@ class Executor:
     ):
         self._program_args = program_args or []
 
+        registered_extensions = (
+            create_default_builtin_extensions() if extensions is None else extensions
+        )
+
         self._stateless_functions: dict[str, FunctionEntry] = {}
-        for ext in extensions or []:
+        for ext in registered_extensions:
             for name, entry in _scan_extension(ext):
                 self._stateless_functions[name] = entry
 
@@ -233,19 +238,18 @@ class Executor:
                 cycle = " -> ".join((*context.macro_call_stack, macro_name))
                 raise BxeRuntimeException(f"Macro recursion detected: {cycle}")
 
-            evaluated_args = [self._evaluate_node(arg, context) for arg in argument_nodes]
             required_args = sum(1 for p in macro.parameters if not p.optional)
             max_args = None if macro.supports_varargs else len(macro.parameters)
 
-            if len(evaluated_args) < required_args:
+            if len(argument_nodes) < required_args:
                 raise TypeError(
                     f"{macro.call_name} expected at least {required_args} parameters, "
-                    f"but got {len(evaluated_args)}"
+                    f"but got {len(argument_nodes)}"
                 )
-            if max_args is not None and len(evaluated_args) > max_args:
+            if max_args is not None and len(argument_nodes) > max_args:
                 raise TypeError(
                     f"{macro.call_name} expected at most {max_args} parameters, "
-                    f"but got {len(evaluated_args)}"
+                    f"but got {len(argument_nodes)}"
                 )
 
             # First-level macro invocations do not count toward this cap.
@@ -259,18 +263,28 @@ class Executor:
                 context.macro_nested_calls_used = projected
 
             param_scope: dict[str, Any] = {}
+            bound_args: list[Any] = []
             for index, param in enumerate(macro.parameters):
-                if index < len(evaluated_args):
-                    param_scope[param.name] = evaluated_args[index]
+                if index < len(argument_nodes):
+                    if param.callable:
+                        value = MacroCallableValue(argument_nodes[index])
+                    else:
+                        value = self._evaluate_node(argument_nodes[index], context)
+                    param_scope[param.name] = value
+                    bound_args.append(value)
                 else:
                     # Optional parameters default to empty string when omitted.
                     param_scope[param.name] = ""
+
+            if macro.supports_varargs and len(argument_nodes) > len(macro.parameters):
+                for arg in argument_nodes[len(macro.parameters):]:
+                    bound_args.append(self._evaluate_node(arg, context))
 
             context.macro_call_stack.append(macro_name)
             context.macro_param_stack.append(
                 MacroInvocationFrame(
                     parameter_values=param_scope,
-                    all_arguments=tuple(evaluated_args),
+                    all_arguments=tuple(bound_args),
                 )
             )
             try:

@@ -7,7 +7,6 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 from bxengine.tokenizer.tokenize import Tokenizer, TokenizationResult
 from bxengine.parsing.parser import Parser, ParsingResult
 from bxengine.runtime.executor import Executor, ExecutorResult
-from bxengine.runtime.extensions.builtin import BuiltinExtension
 from bxengine.runtime.extensions.BxeExtension import BxeExtensionBase, BxeStatefulExtension
 
 
@@ -22,7 +21,7 @@ def run_program(
     par = Parser.parse(code, tok.tokens)
     assert isinstance(par, ParsingResult.Success), f"Parse error: {par.message}"
     exe = Executor(
-        extensions=extensions if extensions is not None else [BuiltinExtension()],
+        extensions=extensions,
         stateful_extensions=stateful_extensions,
         program_args=program_args or [],
     )
@@ -42,7 +41,7 @@ def run_program_raw(
     par = Parser.parse(code, tok.tokens)
     assert isinstance(par, ParsingResult.Success), f"Parse error: {par.message}"
     exe = Executor(
-        extensions=extensions if extensions is not None else [BuiltinExtension()],
+        extensions=extensions,
         stateful_extensions=stateful_extensions,
         program_args=program_args or [],
     )
