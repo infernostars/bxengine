@@ -242,7 +242,13 @@ class StringExtension(BxeStatelessExtension):
         
     @staticmethod
     @bpp_function(category="String")
-    def REGEXREPLACE(a, b, c):
+    def REGEXREPLACE(a: str, b: str, c: str) -> str:
+        """Replaces all sections of the string `s` that match the RegEx `r` with the string `c`
+        @parameter s the string to use
+        @parameter r the RegEx to check
+        @paremeter c the string to replace with
+        @returns the string `s` with replacements made 
+        """
     	try:
     		return re.sub(str(b), str(c), str(a))
     	except:
@@ -250,7 +256,12 @@ class StringExtension(BxeStatelessExtension):
             
     @staticmethod
     @bpp_function(category="String")
-    def REGEXMATCH(a, b):
+    def REGEXMATCH(a: str, b: str) -> str:
+        """Finds all substrings of the string `s` that match the RegEx `r`
+        @parameter s the string to use
+        @parameter r the RegEx to check
+        @returns a list of all substrings of `s` that match `r`
+        """
     	try:
     		return re.findall(str(b), str(a))
     	except:
