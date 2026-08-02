@@ -249,10 +249,10 @@ class StringExtension(BxeStatelessExtension):
         @paremeter c the string to replace with
         @returns the string `s` with replacements made 
         """
-    	try:
-    		return re.sub(str(b), str(c), str(a))
-    	except:
-    		raise ValueError(f"REGEXREPLACE function could not evaluate this RegEx: {_safe_cut(b)}")
+        try:
+            return re.sub(str(b), str(c), str(a))
+        except:
+            raise ValueError(f"REGEXREPLACE function could not evaluate this RegEx: {_safe_cut(b)}")
             
     @staticmethod
     @bpp_function(category="String")
@@ -262,7 +262,7 @@ class StringExtension(BxeStatelessExtension):
         @parameter r the RegEx to check
         @returns a list of all substrings of `s` that match `r`
         """
-    	try:
-    		return re.findall(str(b), str(a))
-    	except:
-    		raise ValueError(f"REGEXMATCH function could not evaluate this RegEx: {_safe_cut(b)}")
+        try:
+            return re.findall(str(b), str(a))
+        except:
+            raise ValueError(f"REGEXMATCH function could not evaluate this RegEx: {_safe_cut(b)}")
