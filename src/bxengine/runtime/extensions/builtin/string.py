@@ -1,4 +1,5 @@
 import random
+import re
 from typing import Any
 
 from bxengine.exceptions import BxeRuntimeException
