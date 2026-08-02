@@ -239,5 +239,19 @@ class StringExtension(BxeStatelessExtension):
         if not isinstance(a, str):
             raise ValueError(f"CHOOSECHAR function parameter is not a string: {_safe_cut(a)}")
         return random.choice(list(a))
-
-
+        
+    @staticmethod
+    @bpp_function(category="String")
+    def REGEXREPLACE(a, b, c):
+    	try:
+    		return re.sub(str(b), str(c), str(a))
+    	except:
+    		raise ValueError(f"REGEXREPLACE function could not evaluate this RegEx: {_safe_cut(b)}")
+            
+    @staticmethod
+    @bpp_function(category="String")
+    def REGEXMATCH(a, b):
+    	try:
+    		return re.findall(str(b), str(a))
+    	except:
+    		raise ValueError(f"REGEXMATCH function could not evaluate this RegEx: {_safe_cut(b)}")
