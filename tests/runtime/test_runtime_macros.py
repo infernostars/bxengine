@@ -52,6 +52,37 @@ class TestMacros:
         code = '[MACRO count [ARRAY "a" "..."] [LENGTH [PARAMS]]] [@count 1 2 3 4]'
         assert run_program(code) == " 4"
 
+    def test_macro_varargs_callable_receives_unevaluated_nodes(self):
+        code = (
+            '[MACRO "twice_all" [ARRAY "prefix" "...:callable"] '
+            '[CONCAT [PARAM prefix] '
+            '[CALL [INDEX [PARAMS] 1]] [CALL [INDEX [PARAMS] 2]]]] '
+            '[DEFINE x 0] '
+            '[@twice_all "r" '
+            '[CONCAT [DEFINE x [MATH [VAR x] + 1]] [VAR x]] '
+            '[CONCAT [DEFINE x [MATH [VAR x] + 1]] [VAR x]]] '
+            '[VAR x]'
+        )
+        assert run_program(code).strip() == "r12 2"
+
+    def test_macro_varargs_without_callable_still_evaluates_eagerly(self):
+        code = (
+            '[MACRO "eager" [ARRAY "..."] "ok"] '
+            '[@eager [THROW "regular vararg evaluated"]]'
+        )
+        res = run_program_raw(code)
+        assert isinstance(res, ExecutorResult.Error)
+        assert "regular vararg evaluated" in str(res.exception)
+
+    def test_macro_varargs_callable_recursion_is_blocked(self):
+        code = (
+            '[MACRO "run" [ARRAY "...:callable"] [CALL [INDEX [PARAMS] 0]]] '
+            '[@run [CALL [INDEX [PARAMS] 0]]]'
+        )
+        res = run_program_raw(code)
+        assert isinstance(res, ExecutorResult.Error)
+        assert isinstance(res.exception, BxeRuntimeException)
+
     def test_macro_callable_parameter_receives_unevaluated_node(self):
         code = (
             '[MACRO "twice" [ARRAY "body:callable"] '

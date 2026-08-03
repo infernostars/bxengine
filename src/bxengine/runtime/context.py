@@ -25,6 +25,7 @@ class MacroDefinition:
     parameters: tuple[MacroParameterSpec, ...]
     supports_varargs: bool
     body: Node
+    varargs_callable: bool = False
 
 
 @dataclass(frozen=True)

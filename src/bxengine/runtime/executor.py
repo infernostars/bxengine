@@ -302,7 +302,10 @@ class Executor:
 
             if macro.supports_varargs and len(argument_nodes) > len(macro.parameters):
                 for arg in argument_nodes[len(macro.parameters):]:
-                    bound_args.append(self._evaluate_node(arg, context))
+                    if macro.varargs_callable:
+                        bound_args.append(MacroCallableValue(arg))
+                    else:
+                        bound_args.append(self._evaluate_node(arg, context))
 
             context.macro_call_stack.append(macro_name)
             context.macro_param_stack.append(

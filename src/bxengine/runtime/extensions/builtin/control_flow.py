@@ -149,7 +149,7 @@ class ControlFlowExtension(BxeStatelessExtension):
     def MACRO(nodes: list[Node], span: SpanData, context: RuntimeContext) -> str:
         """Create a macro that can be called with [@macro params].
         @parameter name the name of the macro
-        @parameter params an array of the names of parameters for the macro. You may add ? to the end of a name to mark it as optional, or :callable to pass the original node without evaluating it. Optional parameters must come after required ones; you can also add ... to the end to allow any number of extra arguments.
+        @parameter params an array of the names of parameters for the macro. You may add ? to the end of a name to mark it as optional, or :callable to pass the original node without evaluating it. Optional parameters must come after required ones; you can also add ... to the end to allow any number of extra arguments, or ...:callable to receive those extra arguments as unevaluated nodes.
         @parameter block the code that the macro will run
         @returns nothing"""
         if len(nodes) != 3:
@@ -166,6 +166,7 @@ class ControlFlowExtension(BxeStatelessExtension):
 
         parameter_specs: list[MacroParameterSpec] = []
         supports_varargs = False
+        varargs_callable = False
         saw_optional_parameter = False
         for index, raw_name in enumerate(parameter_values):
             if not isinstance(raw_name, str):
@@ -173,12 +174,13 @@ class ControlFlowExtension(BxeStatelessExtension):
                     f"Macro parameter name must be a string: {_safe_cut(raw_name)}"
                 )
 
-            if raw_name == "...":
+            if raw_name in ("...", "...:callable"):
                 if supports_varargs:
                     raise BxeRuntimeSyntaxException("MACRO can only declare varargs once")
                 if index != len(parameter_values) - 1:
                     raise BxeRuntimeSyntaxException("MACRO varargs (...) must be the last parameter")
                 supports_varargs = True
+                varargs_callable = raw_name.endswith(":callable")
                 continue
 
             parameter_name = raw_name
@@ -214,6 +216,7 @@ class ControlFlowExtension(BxeStatelessExtension):
             call_name=macro_call_name,
             parameters=tuple(parameter_specs),
             supports_varargs=supports_varargs,
+            varargs_callable=varargs_callable,
             body=nodes[2],
         )
         return ""
