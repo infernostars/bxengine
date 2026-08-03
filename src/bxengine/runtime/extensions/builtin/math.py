@@ -65,8 +65,6 @@ class MathExtension(BxeStatelessExtension):
     def _math_op(a: Any, op: str, c: Any) -> int | float:
         if not _is_number(a):
             raise ValueError(f"First parameter of MATH function is not a number: {_safe_cut(a)}")
-        if op not in "+-*/^%":
-            raise ValueError(f"Operation parameter of MATH function not an operation: {_safe_cut(op)}")
         if not _is_number(c):
             raise ValueError(f"Second parameter of MATH function is not a number: {_safe_cut(c)}")
         a_n = int(a) if _is_whole(a) else float(a)
@@ -107,6 +105,7 @@ class MathExtension(BxeStatelessExtension):
                     f"Parameters of MATH function too large to safely exponentiate: "
                     f"{_safe_cut(a_n)}, {_safe_cut(c_n)}"
                 )
+        raise ValueError(f"Operation parameter of MATH function not an operation: {_safe_cut(op)}")
 
     @staticmethod
     @bpp_function(category="Math")
